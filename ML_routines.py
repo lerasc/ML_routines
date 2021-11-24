@@ -3,6 +3,8 @@ import numpy   as np
 import pandas  as pd
 import seaborn as sb
 
+from itertools import product
+
 from sklearn.metrics  import accuracy_score, f1_score, confusion_matrix, roc_curve, roc_auc_score
 
 
