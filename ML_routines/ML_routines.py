@@ -3,23 +3,7 @@ import numpy   as np
 import pandas  as pd
 import seaborn as sb
 
-from itertools import product
-
 from sklearn.metrics  import accuracy_score, f1_score, confusion_matrix, roc_curve, roc_auc_score
-
-
-def form_all_combinations( args ):
-    """
-    Input is a dictionary with a list of values for each key. Then, all combinations are formed and rearanged into 
-    a list of dictionaries, with one combination each. 
-    """
-
-    keys        = list( args.keys()    )                                   # list of keys
-    lov         = list( args.values()  )                                   # list of values
-    combs       = list( product(*lov) )                                    # all value combinations
-    lo_args     = [dict(zip(keys, vals)) for vals in combs]                # list of different x dicts
-
-    return lo_args
 
 
 def plot_confusion_matrix( y_true, y_pred, ax, labels=None, **kwargs ):
@@ -67,9 +51,9 @@ def plot_confusion_matrix( y_true, y_pred, ax, labels=None, **kwargs ):
     ax.set_title('accuracy =%.2f%%'%acc)
 
 
-def plot_ROC_curve( y_true, y_pred, ax ):
+def plot_ROC_curve( y_true, y_pred, ax, **kwargs ):
     """
-    Plot the ROC curve into axis instance ax.
+    Plot the ROC curve into axis instance ax (kwargs are for the plotting).
     """
 
     FP, TP, _ = roc_curve(      y_true, y_pred )
@@ -83,7 +67,7 @@ def plot_ROC_curve( y_true, y_pred, ax ):
     score = f'ROC score={roc:.0f}%\naccuracy={acc:.0f}%\nF1={f1:.0f}%'
 
     ax.plot([0, 1], [0, 1], 'k--')
-    ax.plot( FP, TP, label='' )
+    ax.plot( FP, TP, **kwargs )
     ax.text( x=0.1, y=0.8, s=score, fontsize=10 )    
 
     ax.set_xlabel('false positive rate')
