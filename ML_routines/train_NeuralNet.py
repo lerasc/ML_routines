@@ -131,7 +131,6 @@ def train_basic_NN(X, y, architecture='FFNN', regression=True):
     grid = GridSearchCV(  estimator     = model,
                            param_grid   = param_grid,
                            cv           = KFold(n_splits=5),
-                           njobs        = -1, 
                            verbose      = 1,
                          )
 
