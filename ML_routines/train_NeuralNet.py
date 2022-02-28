@@ -38,8 +38,6 @@ def train_basic_NN(X, y, architecture='FFNN', regression=True):
 
     # check input data
     ####################################################################################################################
-    assert isinstance(X, [np.ndarray,pd.DataFrame]), 'ivalid input type for X'
-    assert isinstance(y, [np.ndarray,pd.Series]),    'ivalid input type for y'
     assert X.shape[0]==len(y),                       'shape of X and y not matching'
 
     nfeat = X.shape[1] # number of features
@@ -130,9 +128,10 @@ def train_basic_NN(X, y, architecture='FFNN', regression=True):
                             verbose    = False,
                            )
 
-    grid = GridSearchCV( estimator      = model,
+    grid = GridSearchCV(  estimator     = model,
                            param_grid   = param_grid,
                            cv           = KFold(n_splits=5),
+                           njobs        = -1, 
                            verbose      = 1,
                          )
 
