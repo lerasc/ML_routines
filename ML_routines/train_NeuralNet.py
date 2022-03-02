@@ -1,14 +1,16 @@
 
+import os
 import logging
 
-import numpy  as np
-import pandas as pd
 from keras                       import layers
 from keras.models                import Sequential
 from keras.callbacks             import EarlyStopping
-from keras.wrappers.scikit_learn import KerasClassifier
+from keras.wrappers.scikit_learn import KerasClassifier, KerasRegressor
 
 from sklearn.model_selection     import KFold, GridSearchCV, train_test_split
+
+import tensorflow as tf
+from tensorflow.python.util import deprecation
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -20,9 +22,33 @@ logging.getLogger("pytorch_transformers.tokenization_utils").setLevel(logging.ER
 logging.getLogger("transformers.tokenization_utils").setLevel(logging.ERROR)
 
 
+def tensorflow_shutup( ):
+    """
+    Make Tensorflow (which underlies keras) less verbose. Code is obtained from [1].
+    [1] https://www.codegrepper.com/code-examples/python/tensorflow+disable+warnings
+    """
+
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+    # noinspection PyPackageRequirements
+
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+
+    # Monkey patching deprecation utils to shut it up! Maybe good idea to disable this once after upgrade
+    # noinspection PyUnusedLocal
+    def deprecated(date, instructions, warn_once=True):  # pylint: disable=unused-argument
+        def deprecated_wrapper(func):
+            return func
+        return deprecated_wrapper
+
+    deprecation.deprecated = deprecated
+
+
 def train_basic_NN(X, y, architecture='FFNN', regression=True):
     """
-    Generate, train and return a basic neural net.
+    Generate, train and return a basic neural net. Here, 'basic' is meant in two senses. First, the models are basic
+    because they rely on mostly default parameters and simple architectures. Second, the models are basic because the
+    input features X are expected to be one dimensional.
 
     :param X:               DataFrame with training data.
 
@@ -35,6 +61,8 @@ def train_basic_NN(X, y, architecture='FFNN', regression=True):
 
     :param regression:      If True, train a regression, else train a binary classifier.
     """
+
+    tensorflow_shutup()
 
     # check input data
     ####################################################################################################################
@@ -122,11 +150,12 @@ def train_basic_NN(X, y, architecture='FFNN', regression=True):
                   'rate':  [ 0.0, 0.1,   0.2 ],
                  }
 
-    model = KerasClassifier(build_fn   = build_NN,
-                            epochs     = 10,
-                            batch_size = 64,
-                            verbose    = False,
-                           )
+    wrap  = KerasRegressor if regression else KerasClassifier
+    model = wrap(   build_fn   = build_NN,
+                    epochs     = 10,
+                    batch_size = 64,
+                    verbose    = False,
+                   )
 
     grid = GridSearchCV(  estimator     = model,
                            param_grid   = param_grid,
