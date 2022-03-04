@@ -47,7 +47,7 @@ def tensorflow_shutup( ):
     deprecation.deprecated = deprecated
 
 
-def train_basic_NN( X, y, architecture='FFNN', regression=True, verbose=True ):
+def train_basic_NN( X, y, architecture='FFNN', regression=True, param_grid=None, verbose=True ):
     """
     Generate, train and return a basic neural net. Here, 'basic' is meant in two senses. First, the models are basic
     because they rely on mostly default parameters and simple architectures. Second, the models are basic because the
@@ -60,6 +60,7 @@ def train_basic_NN( X, y, architecture='FFNN', regression=True, verbose=True ):
                             - 'CONV':   train a basic convolutional layer
                             - 'FFNN':   train a basic feed forward neural net
     :param regression:      If True, train a regression, else train a binary classifier.
+    :param param_grid:      Parameter combinations to test (use default ones if None).
     :param verbose:         If True, print status progress.
 
     :return NN:             trained and cross-validated NN instance
@@ -173,38 +174,41 @@ def train_basic_NN( X, y, architecture='FFNN', regression=True, verbose=True ):
                         )
 
     fit_args =  {
+                'epochs'          : 100, # just make it large enough, since we use early stopping
+                'batch_size'      : 40,
                 'validation_data' : (X_stop, y_stop),
                 'callbacks'       : [es],
                 }
 
     # We tune the meta-parameters:
     ####################################################################################################################
-    param_grid = {
-                  'units': [ 50,  100,  200  ],
-                  'rate':  [ 0.0, 0.1,   0.4 ],
-                 }
+    if param_grid is None:
+
+        param_grid = {
+                      'units': [ 50,  100,  200  ],
+                      'rate':  [ 0.0, 0.1,   0.4 ],
+                     }
 
     wrap  = KerasRegressor if regression else KerasClassifier
     model = wrap(   build_fn   = build_NN,
-                    epochs     = 100, # just make it large enough, since we use early stopping
-                    batch_size = 40,
                     verbose    = False,
+                    **fit_args, # call-back
                    )
 
     scoring  = 'neg_root_mean_squared_error' if regression else 'f1'
     grid     = GridSearchCV(   estimator    =  model,
                                param_grid   =  param_grid,
                                scoring      =  scoring,
-                               cv           =  KFold(n_splits=5),
+                               cv           =  KFold(n_splits=4),
                                refit        =  False, # we fit again below, to get the history
                                verbose      =  5 if verbose else 0,
                                error_score  = 'raise',
                              )
 
     _     = grid.fit( X, y, **fit_args )
-    NN    = grid.best_estimator_
+    NN    = build_NN( **grid.best_params_ )
 
-    # print restulrs
+    # print results
     ####################################################################################################################
     log       = f'selected parameters:\n{grid.best_params_}'
     scores    =  grid.cv_results_['mean_test_score']
@@ -217,20 +221,20 @@ def train_basic_NN( X, y, architecture='FFNN', regression=True, verbose=True ):
 
     for mean, std, params in zip(means, stds, params): log += "\n%0.3f (+/-%0.03f) for %r" % (mean, std, params)
 
-    if verbose:
-        print(log)
-        print('model summary:')
-        print(NN.summary())
+    if verbose: print(log)
 
     # fit again on all data (rather than using refit in Crossvalidation above, since we want the history)
     ####################################################################################################################
     history = NN.fit(   x               =  X,
                         y               =  y,
-                        epochs          =  120,  # large enough value, insce we use call-back
-                        batch_size      =  64,
                         verbose         =  False,
-                        **fit_args, # callback
+                         **fit_args,
                        )
+
+    if verbose:
+        print('model summary:')
+        print(NN.summary())
+
 
     return NN, history, grid
 
