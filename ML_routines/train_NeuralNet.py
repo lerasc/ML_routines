@@ -44,7 +44,7 @@ def tensorflow_shutup( ):
     deprecation.deprecated = deprecated
 
 
-def train_basic_NN(X, y, architecture='FFNN', regression=True):
+def train_basic_NN( X, y, architecture='FFNN', regression=True ):
     """
     Generate, train and return a basic neural net. Here, 'basic' is meant in two senses. First, the models are basic
     because they rely on mostly default parameters and simple architectures. Second, the models are basic because the
@@ -118,12 +118,17 @@ def train_basic_NN(X, y, architecture='FFNN', regression=True):
 
         elif architecture== 'FFNN':
 
-            model.add( layers.Dense(   units=units,    activation='relu', input_shape=(nfeat,) ))
-            model.add( layers.Dropout( rate=rate  ))
+            model.add( layers.BatchNormalization() ) 
+            model.add( layers.Dense(   units=units,    activation='relu', input_shape=(nfeat,) ))            
+            model.add( layers.BatchNormalization() ) 
+            model.add( layers.Dropout( rate=rate  ))            
+
             model.add( layers.Dense(   units=units//2, activation='relu', ))
-            model.add( layers.Dropout( rate=rate  ))
+            model.add( layers.BatchNormalization() ) 
+            model.add( layers.Dropout( rate=rate  ))            
+
             model.add( layers.Dense(   units=units//4, activation='relu', ))
-            model.add( layers.Dense(   units=units//6, activation='relu', ))
+            model.add( layers.BatchNormalization() ) 
 
         else:
 
@@ -136,8 +141,8 @@ def train_basic_NN(X, y, architecture='FFNN', regression=True):
         # add details on objective function and fitting method
         #########################################################################
         model.compile(
-                      optimizer=  'adam',
-                      loss     =  'mse'       if regression else 'binary_crossentropy',
+                      optimizer=   'adam',
+                      loss     =   'mse'      if regression else 'binary_crossentropy',
                       metrics  =  ['mse']     if regression else ['accuracy'],
                      )
 
@@ -152,15 +157,17 @@ def train_basic_NN(X, y, architecture='FFNN', regression=True):
 
     wrap  = KerasRegressor if regression else KerasClassifier
     model = wrap(   build_fn   = build_NN,
-                    epochs     = 10,
-                    batch_size = 64,
+                    epochs     = 50,
+                    batch_size = 40,
                     verbose    = False,
                    )
 
-    grid = GridSearchCV(  estimator     = model,
-                           param_grid   = param_grid,
-                           cv           = KFold(n_splits=5),
-                           verbose      = 1,
+    grid = GridSearchCV(   estimator    =  model,
+                           param_grid   =  param_grid,
+                           scoring      = 'neg_root_mean_squared_error',
+                           cv           =  KFold(n_splits=5),
+                           verbose      =  1,
+                           error_score  = 'raise',
                          )
 
     grid_result   = grid.fit( X, y )
