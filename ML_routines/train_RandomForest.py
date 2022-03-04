@@ -18,9 +18,9 @@ def train_RandomForest( X, y, regression=True, boost=False, cv=None, verbose=Fal
     :param cv:          Cross-validation instance (use 5-fold if set to None).
     :param verbose:     If True, print results. Else, return only as log-file
 
-    :param RF:          Trained and cross-validated RF instance
-    :param search:      GridSearchCV instance
-    :param log:         Log with results.
+    :return RF:         trained and cross-validated RF instance
+    :return grid:       GridSearchCV instance
+    :return log:        log with results
     """
 
     # check input
@@ -43,7 +43,7 @@ def train_RandomForest( X, y, regression=True, boost=False, cv=None, verbose=Fal
                 )
 
         hyper_params =    {
-                            'max_depth':                [  4,   8,  16     ],
+                            'max_depth':                [  2,  4,   16     ],
                             'min_weight_fraction_leaf': [ 0.05,     0.1    ],
                             }
 
@@ -66,7 +66,7 @@ def train_RandomForest( X, y, regression=True, boost=False, cv=None, verbose=Fal
                 )
 
         hyper_params =    {
-                            'max_depth':          [  2, 4                         ],
+                            'max_depth':          [  2, 4, 6                      ],
                             'learning_rate':      [  0.01, 0.1,  0.3              ],
                             'gamma':              [  0.0,  0.1,  4                ],
                             }
@@ -91,7 +91,7 @@ def train_RandomForest( X, y, regression=True, boost=False, cv=None, verbose=Fal
     ####################################################################################################################
     scoring  = 'neg_root_mean_squared_error' if regression else 'f1'
     cv       = KFold( n_splits=5, shuffle=True ) if cv is None else cv
-    search   = GridSearchCV(  RF,
+    grid     = GridSearchCV(  RF,
                               param_grid   =  hyper_params,
                               scoring      =  scoring,
                               cv           =  cv,
@@ -100,22 +100,22 @@ def train_RandomForest( X, y, regression=True, boost=False, cv=None, verbose=Fal
                               error_score  = 'raise',
                               )
 
-    _         =  search.fit( X, y, **fit_args  )
-    RF        =  search.best_estimator_
+    _         =  grid.fit( X, y, **fit_args  )
+    RF        =  grid.best_estimator_
 
     # print status
     ####################################################################################################################
-    log       = f'selected parameters:\n{search.best_params_}'
-    scores    =  search.cv_results_['mean_test_score']
+    log       = f'selected parameters:\n{grid.best_params_}'
+    scores    =  grid.cv_results_['mean_test_score']
     args      =  np.argsort(scores)
-    params    =  np.array(search.cv_results_['params'])[args]
-    means     =  np.array(search.cv_results_['mean_test_score'])[args]
-    stds      =  np.array(search.cv_results_['std_test_score'])[args]
+    params    =  np.array(grid.cv_results_['params'])[args]
+    means     =  np.array(grid.cv_results_['mean_test_score'])[args]
+    stds      =  np.array(grid.cv_results_['std_test_score'])[args]
 
-    log      += 'score per combination:\n'
+    log      += '\n\nscore per combination:\n'
 
     for mean, std, params in zip(means, stds, params): log += "\n%0.3f (+/-%0.03f) for %r" % (mean, std, params)
     if verbose: print(log)
 
-    return RF, search, log
+    return RF, grid, log
 

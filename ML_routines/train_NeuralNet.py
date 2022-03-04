@@ -2,6 +2,9 @@
 import os
 import logging
 
+import numpy  as np
+import pandas as pd
+
 from keras                       import layers
 from keras.models                import Sequential
 from keras.callbacks             import EarlyStopping
@@ -44,23 +47,32 @@ def tensorflow_shutup( ):
     deprecation.deprecated = deprecated
 
 
-def train_basic_NN( X, y, architecture='FFNN', regression=True ):
+def train_basic_NN( X, y, architecture='FFNN', regression=True, verbose=True ):
     """
     Generate, train and return a basic neural net. Here, 'basic' is meant in two senses. First, the models are basic
     because they rely on mostly default parameters and simple architectures. Second, the models are basic because the
     input features X are expected to be one dimensional.
 
-    :param X:               DataFrame with training data.
-
-    :param y:               Pandas Series with target data (must have same index as X)
-
+    :param X:               The input features (rows are datapoints, columns are features).
+    :param y:               The targets.
     :param architecture:    What neural net architecture to use:
                             - 'LSTM':   train a basic LSTM network
                             - 'CONV':   train a basic convolutional layer
                             - 'FFNN':   train a basic feed forward neural net
-
     :param regression:      If True, train a regression, else train a binary classifier.
+    :param verbose:         If True, print status progress.
+
+    :return NN:             trained and cross-validated NN instance
+    :return history:        NN training history
+    :return grid:           GridSearchCV instance
     """
+
+
+    # check input
+    ####################################################################################################################
+    assert isinstance(X, pd.DataFrame), 'X must be DataFrame'
+    assert isinstance(y, pd.Series),    'y must be Series'
+    assert X.shape[0]==len(y),          'X and y must be of same length '
 
     tensorflow_shutup()
 
@@ -118,14 +130,14 @@ def train_basic_NN( X, y, architecture='FFNN', regression=True ):
 
         elif architecture== 'FFNN':
 
-            model.add( layers.BatchNormalization() ) 
+            model.add( layers.BatchNormalization()  )
             model.add( layers.Dense(   units=units,    activation='relu', input_shape=(nfeat,) ))            
-            model.add( layers.BatchNormalization() ) 
-            model.add( layers.Dropout( rate=rate  ))            
+            model.add( layers.BatchNormalization()  )
+            model.add( layers.Dropout( rate=rate  ) )
 
             model.add( layers.Dense(   units=units//2, activation='relu', ))
-            model.add( layers.BatchNormalization() ) 
-            model.add( layers.Dropout( rate=rate  ))            
+            model.add( layers.BatchNormalization()  )
+            model.add( layers.Dropout( rate=rate  ) )
 
             model.add( layers.Dense(   units=units//4, activation='relu', ))
             model.add( layers.BatchNormalization() ) 
@@ -137,7 +149,6 @@ def train_basic_NN( X, y, architecture='FFNN', regression=True ):
         activation = 'linear' if regression else 'sigmoid'
         model.add( layers.Dense(1, activation=activation)) # final contraction layer
 
-
         # add details on objective function and fitting method
         #########################################################################
         model.compile(
@@ -148,59 +159,78 @@ def train_basic_NN( X, y, architecture='FFNN', regression=True ):
 
         return model
 
+
+    # We stop training once we don't improve on cross-validation data. Since we already use cross-validation data below
+    # to test different architectures, here we reserve some 'stopping data' that we use for early stopping.
+    ####################################################################################################################
+    X, X_stop, y, y_stop = train_test_split( X, y, test_size=0.05 )
+
+    es  = EarlyStopping(monitor              = 'val_mse' if regression else 'val_loss',
+                        patience             =  5,
+                        min_delta            =  1e-4,
+                        restore_best_weights =  True,
+                        verbose              =  True,
+                        )
+
+    fit_args =  {
+                'validation_data' : (X_stop, y_stop),
+                'callbacks'       : [es],
+                }
+
     # We tune the meta-parameters:
     ####################################################################################################################
     param_grid = {
                   'units': [ 50,  100,  200  ],
-                  'rate':  [ 0.0, 0.1,   0.2 ],
+                  'rate':  [ 0.0, 0.1,   0.4 ],
                  }
 
     wrap  = KerasRegressor if regression else KerasClassifier
     model = wrap(   build_fn   = build_NN,
-                    epochs     = 50,
+                    epochs     = 100, # just make it large enough, since we use early stopping
                     batch_size = 40,
                     verbose    = False,
                    )
 
-    grid = GridSearchCV(   estimator    =  model,
-                           param_grid   =  param_grid,
-                           scoring      = 'neg_root_mean_squared_error',
-                           cv           =  KFold(n_splits=5),
-                           verbose      =  1,
-                           error_score  = 'raise',
-                         )
+    scoring  = 'neg_root_mean_squared_error' if regression else 'f1'
+    grid     = GridSearchCV(   estimator    =  model,
+                               param_grid   =  param_grid,
+                               scoring      =  scoring,
+                               cv           =  KFold(n_splits=5),
+                               refit        =  False, # we fit again below, to get the history
+                               verbose      =  5 if verbose else 0,
+                               error_score  = 'raise',
+                             )
 
-    grid_result   = grid.fit( X, y )
+    _     = grid.fit( X, y, **fit_args )
+    NN    = grid.best_estimator_
 
-    print('best parameter configuration: %s'%grid_result.best_params_)
-    print('best test accuracy: %.2f'%grid_result.best_score_)
-
-    params      = grid_result.best_params_
-    best_model  = build_NN( **params )
-    print(best_model.summary())
-
-    # set the best parameters and train until we do no longer improve on the cross validation set:
+    # print restulrs
     ####################################################################################################################
-    X_train, X_val, y_train, y_val = train_test_split(  X, y,
-                                                        stratify=None if regression else y,
-                                                        test_size=0.15
-                                                     )
+    log       = f'selected parameters:\n{grid.best_params_}'
+    scores    =  grid.cv_results_['mean_test_score']
+    args      =  np.argsort(scores)
+    params    =  np.array(grid.cv_results_['params'])[args]
+    means     =  np.array(grid.cv_results_['mean_test_score'])[args]
+    stds      =  np.array(grid.cv_results_['std_test_score'])[args]
 
-    es          = EarlyStopping(monitor              = 'val_mse' if regression else 'val_loss',
-                                patience             =  5,
-                                min_delta            =  1e-4,
-                                restore_best_weights =  True,
-                                verbose              =  True,
-                                )
+    log      += '\n\nscore per combination:\n'
 
-    history     = best_model.fit(   x               =  X_train,
-                                    y               =  y_train,
-                                    validation_data = (X_val, y_val),
-                                    epochs          =  120,  # large enough value
-                                    batch_size      =  64,
-                                    verbose         =  False,
-                                    callbacks       = [es],
-                                   )
+    for mean, std, params in zip(means, stds, params): log += "\n%0.3f (+/-%0.03f) for %r" % (mean, std, params)
 
-    return best_model, history, grid_result
+    if verbose:
+        print(log)
+        print('model summary:')
+        print(NN.summary())
+
+    # fit again on all data (rather than using refit in Crossvalidation above, since we want the history)
+    ####################################################################################################################
+    history = NN.fit(   x               =  X,
+                        y               =  y,
+                        epochs          =  120,  # large enough value, insce we use call-back
+                        batch_size      =  64,
+                        verbose         =  False,
+                        **fit_args, # callback
+                       )
+
+    return NN, history, grid
 
