@@ -67,6 +67,7 @@ def train_basic_NN( X, y, architecture='FFNN', regression=True, param_grid=None,
     :return NN:             trained and cross-validated NN instance
     :return history:        NN training history
     :return grid:           GridSearchCV instance
+    :return log:            string with info about training
     """
 
 
@@ -237,6 +238,6 @@ def train_basic_NN( X, y, architecture='FFNN', regression=True, param_grid=None,
         print(NN.summary())
 
 
-    if full_ret: return NN, history, grid
+    if full_ret: return NN, history, grid, log 
     else:        return NN
 
