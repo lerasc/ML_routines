@@ -47,7 +47,7 @@ def tensorflow_shutup( ):
     deprecation.deprecated = deprecated
 
 
-def train_basic_NN( X, y, architecture='FFNN', regression=True, param_grid=None, verbose=True ):
+def train_basic_NN( X, y, architecture='FFNN', regression=True, param_grid=None, verbose=True, full_ret=False ):
     """
     Generate, train and return a basic neural net. Here, 'basic' is meant in two senses. First, the models are basic
     because they rely on mostly default parameters and simple architectures. Second, the models are basic because the
@@ -62,6 +62,7 @@ def train_basic_NN( X, y, architecture='FFNN', regression=True, param_grid=None,
     :param regression:      If True, train a regression, else train a binary classifier.
     :param param_grid:      Parameter combinations to test (use default ones if None).
     :param verbose:         If True, print status progress.
+    :param full_ret:        If True, return more than just the trained NN (cf. return arguments)
 
     :return NN:             trained and cross-validated NN instance
     :return history:        NN training history
@@ -236,5 +237,6 @@ def train_basic_NN( X, y, architecture='FFNN', regression=True, param_grid=None,
         print(NN.summary())
 
 
-    return NN, history, grid
+    if full_ret: return NN, history, grid
+    else:        return NN
 

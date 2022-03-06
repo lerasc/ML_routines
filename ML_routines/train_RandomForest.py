@@ -7,7 +7,7 @@ from sklearn.ensemble         import RandomForestRegressor, RandomForestClassifi
 from sklearn.model_selection  import train_test_split, KFold, GridSearchCV
 
 
-def train_RandomForest( X, y, regression=True, boost=False, cv=None, verbose=False ):
+def train_RandomForest( X, y, regression=True, boost=False, cv=None, verbose=False, full_ret=False ):
     """
     Train a random forest or boosted forest including k-fold cross-validation.
 
@@ -17,6 +17,7 @@ def train_RandomForest( X, y, regression=True, boost=False, cv=None, verbose=Fal
     :param boost:       It True, run XGboost rather than a Random Forest.
     :param cv:          Cross-validation instance (use 5-fold if set to None).
     :param verbose:     If True, print results. Else, return only as log-file
+    :param full_ret:    If True, return more than just the trained NN (cf. return arguments)
 
     :return RF:         trained and cross-validated RF instance
     :return grid:       GridSearchCV instance
@@ -117,5 +118,6 @@ def train_RandomForest( X, y, regression=True, boost=False, cv=None, verbose=Fal
     for mean, std, params in zip(means, stds, params): log += "\n%0.3f (+/-%0.03f) for %r" % (mean, std, params)
     if verbose: print(log)
 
-    return RF, grid, log
+    if full_ret: return RF, grid, log
+    else:        return RF
 
