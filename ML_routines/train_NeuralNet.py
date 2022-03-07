@@ -47,7 +47,7 @@ def tensorflow_shutup( ):
     deprecation.deprecated = deprecated
 
 
-def train_basic_NN( X, y, architecture='FFNN', regression=True, param_grid=None, verbose=True, full_ret=False ):
+def train_NeuralNet( X, y, architecture='FFNN', regression=True, param_grid=None, verbose=True, full_ret=False ):
     """
     Generate, train and return a basic neural net. Here, 'basic' is meant in two senses. First, the models are basic
     because they rely on mostly default parameters and simple architectures. Second, the models are basic because the
