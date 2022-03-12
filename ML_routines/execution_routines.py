@@ -25,7 +25,7 @@ def get_path( subdir=None, ROOT='', create=False, error='raise' ):
     :param subdir:      if not None, a subdirectory of the root path.
     :param ROOT:        path to root folder where git repo is located. Must exist. 
     :param create:      if True, create the subdir if it does not yet exist
-    :param error:       'raise' error if an existig folder is created or non-existing one not created, else 'ignore'
+    :param error:       'raise' error if an existing folder is created or non-existing one not created, else 'ignore'
 
     :return folder:     path to directory
     """
@@ -34,9 +34,11 @@ def get_path( subdir=None, ROOT='', create=False, error='raise' ):
 
     # initialize folder path as root to directory, and check that it exists
     ####################################################################################################################
-    folder = ROOT # initialize 
-
-    if not os.path.exists(folder): raise ValueError(f'invalid ROOT path {ROOT}')
+    if ROOT is not None:
+        folder = ROOT     # initialize
+        if not os.path.exists(folder): raise ValueError(f'invalid ROOT path {ROOT}')
+    else:
+        folder = ''
 
     # add subdir and check if it exists, if not, create it
     ####################################################################################################################
