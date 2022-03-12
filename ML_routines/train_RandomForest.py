@@ -67,7 +67,7 @@ def train_RandomForest( X, y, regression=True, boost=False, cv=None, verbose=Fal
                 )
 
         hyper_params =    {
-                            'max_depth':          [  2, 4, 6                      ],
+                            'max_depth':          [  2, 4, 10                     ],
                             'learning_rate':      [  0.01, 0.1,  0.3              ],
                             'gamma':              [  0.0,  0.1,  4                ],
                             }
