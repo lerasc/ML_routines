@@ -90,7 +90,7 @@ def train_RandomForest( X, y, regression=True, boost=False, cv=None, verbose=Fal
 
     # cross-validation
     ####################################################################################################################
-    scoring  = 'neg_root_mean_squared_error' if regression else 'f1'
+    scoring  = 'neg_mean_squared_error' if regression else 'f1'
     cv       = KFold( n_splits=5, shuffle=True ) if cv is None else cv
     grid     = GridSearchCV(  RF,
                               param_grid   =  hyper_params,

@@ -197,7 +197,7 @@ def train_NeuralNet( X, y, architecture='FFNN', regression=True, param_grid=None
                     **fit_args, # call-back
                    )
 
-    scoring  = 'neg_root_mean_squared_error' if regression else 'f1'
+    scoring  = 'neg_mean_squared_error' if regression else 'f1'
     grid     = GridSearchCV(   estimator    =  model,
                                param_grid   =  param_grid,
                                scoring      =  scoring,
