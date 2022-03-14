@@ -49,7 +49,7 @@ def train_RandomForest(X, y,
                 n_jobs                   =  -1
                 )
 
-        if param_grid is not None:  param_grid =    {
+        if param_grid is None:  param_grid =    {
                                                         'max_depth':                [  2,  4,   16     ],
                                                         'min_weight_fraction_leaf': [ 0.05,     0.1    ],
                                                         }
@@ -72,7 +72,7 @@ def train_RandomForest(X, y,
                 silent              =   True,
                 )
 
-        if param_grid is not None: param_grid =    {
+        if param_grid is None: param_grid =    {
                                                         'max_depth':          [  2, 4, 10                     ],
                                                         'learning_rate':      [  0.01, 0.1,  0.3              ],
                                                         'gamma':              [  0.0,  0.1,  4                ],
