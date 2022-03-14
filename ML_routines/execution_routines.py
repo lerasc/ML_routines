@@ -53,4 +53,8 @@ def get_path( subdir=None, ROOT='', create=False, error='raise' ):
     elif not exists and not create and error=='raise':  raise ValueError(f'folder {folder} does not exist')
     elif not exists and not create and error=='ignore': pass
 
+    # make sure it ends with a '/'
+    ####################################################################################################################
+    if not folder.endswith('/'): folder + '/' # make sure it ends with '/'
+
     return folder        

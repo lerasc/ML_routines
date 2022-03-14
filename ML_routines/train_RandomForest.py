@@ -6,8 +6,14 @@ from xgboost                  import XGBRegressor,          XGBClassifier
 from sklearn.ensemble         import RandomForestRegressor, RandomForestClassifier
 from sklearn.model_selection  import train_test_split, KFold, GridSearchCV
 
-
-def train_RandomForest( X, y, regression=True, boost=False, cv=None, verbose=False, full_ret=False ):
+def train_RandomForest(X, y,
+                       regression   = True,
+                       boost        = False,
+                       cv           = None,
+                       param_grid   = None,
+                       verbose      = False,
+                       full_ret     = False,
+                       ):
     """
     Train a random forest or boosted forest including k-fold cross-validation.
 
@@ -37,16 +43,16 @@ def train_RandomForest( X, y, regression=True, boost=False, cv=None, verbose=Fal
         RF = RandomForestRegressor if regression else RandomForestClassifier
 
         RF = RF(n_estimators             =  1000 ,
-                max_features             =  0.5,
+                max_features             =  'sqrt',
                 max_depth                =  14,
                 min_weight_fraction_leaf =  0.05,
                 n_jobs                   =  -1
                 )
 
-        hyper_params =    {
-                            'max_depth':                [  2,  4,   16     ],
-                            'min_weight_fraction_leaf': [ 0.05,     0.1    ],
-                            }
+        if param_grid is not None:  param_grid =    {
+                                                        'max_depth':                [  2,  4,   16     ],
+                                                        'min_weight_fraction_leaf': [ 0.05,     0.1    ],
+                                                        }
 
         fit_args = { } # no additional arguments for sklearn's fitting method
 
@@ -66,11 +72,11 @@ def train_RandomForest( X, y, regression=True, boost=False, cv=None, verbose=Fal
                 silent              =   True,
                 )
 
-        hyper_params =    {
-                            'max_depth':          [  2, 4, 10                     ],
-                            'learning_rate':      [  0.01, 0.1,  0.3              ],
-                            'gamma':              [  0.0,  0.1,  4                ],
-                            }
+        if param_grid is not None: param_grid =    {
+                                                        'max_depth':          [  2, 4, 10                     ],
+                                                        'learning_rate':      [  0.01, 0.1,  0.3              ],
+                                                        'gamma':              [  0.0,  0.1,  4                ],
+                                                        }
 
         # Rather than fixing n_estimators (i.e. n_boosting_rounds) to a decently small value, we instead stop the
         # training based on an early stopping criteria.
@@ -92,14 +98,14 @@ def train_RandomForest( X, y, regression=True, boost=False, cv=None, verbose=Fal
     ####################################################################################################################
     scoring  = 'neg_mean_squared_error' if regression else 'f1'
     cv       = KFold( n_splits=5, shuffle=True ) if cv is None else cv
-    grid     = GridSearchCV(  RF,
-                              param_grid   =  hyper_params,
-                              scoring      =  scoring,
-                              cv           =  cv,
-                              refit        =  True,
-                              verbose      =  verbose,
-                              error_score  = 'raise',
-                              )
+    grid     = GridSearchCV(RF,
+                            param_grid   =  param_grid,
+                            scoring      =  scoring,
+                            cv           =  cv,
+                            refit        =  True,
+                            verbose      =  verbose,
+                            error_score  = 'raise',
+                            )
 
     _         =  grid.fit( X, y, **fit_args  )
     RF        =  grid.best_estimator_
