@@ -34,7 +34,7 @@ def get_path( subdir=None, ROOT='', create=False, error='raise' ):
 
     # initialize folder path as root to directory, and check that it exists
     ####################################################################################################################
-    if ROOT is not None:
+    if ROOT not in [ None, '', ' ' ]:
         folder = ROOT     # initialize
         if not os.path.exists(folder): raise ValueError(f'invalid ROOT path {ROOT}')
     else:
