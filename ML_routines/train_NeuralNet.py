@@ -47,7 +47,14 @@ def tensorflow_shutup( ):
     deprecation.deprecated = deprecated
 
 
-def train_NeuralNet( X, y, architecture='FFNN', regression=True, param_grid=None, verbose=True, full_ret=False ):
+def train_NeuralNet( X, y,
+                     architecture ='FFNN',
+                     regression  =  True,
+                     cv          =  None,
+                     param_grid  =  None,
+                     verbose     =  True,
+                     full_ret    =  False
+                     ):
     """
     Generate, train and return a basic neural net. Here, 'basic' is meant in two senses. First, the models are basic
     because they rely on mostly default parameters and simple architectures. Second, the models are basic because the
@@ -60,6 +67,7 @@ def train_NeuralNet( X, y, architecture='FFNN', regression=True, param_grid=None
                             - 'CONV':   train a basic convolutional layer
                             - 'FFNN':   train a basic feed forward neural net
     :param regression:      If True, train a regression, else train a binary classifier.
+    :param cv:              Cross-validation instance (use 5-fold if set to None).
     :param param_grid:      Parameter combinations to test (use default ones if None).
     :param verbose:         If True, print status progress.
     :param full_ret:        If True, return more than just the trained NN (cf. return arguments)
@@ -201,7 +209,7 @@ def train_NeuralNet( X, y, architecture='FFNN', regression=True, param_grid=None
     grid     = GridSearchCV(   estimator    =  model,
                                param_grid   =  param_grid,
                                scoring      =  scoring,
-                               cv           =  KFold(n_splits=4),
+                               cv           =  KFold(n_splits=5) if cv is None else cv,
                                refit        =  False, # we fit again below, to get the history
                                verbose      =  5 if verbose else 0,
                                error_score  = 'raise',
