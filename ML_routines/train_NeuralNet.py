@@ -211,7 +211,8 @@ def train_NeuralNet( X, y,
                                scoring      =  scoring,
                                cv           =  KFold(n_splits=5) if cv is None else cv,
                                refit        =  False, # we fit again below, to get the history
-                               verbose      =  5 if verbose else 0,
+                               n_jobs       =  -1, 
+                               verbose      =  5 if verbose else 0,                               
                                error_score  = 'raise',
                              )
 

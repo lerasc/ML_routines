@@ -42,7 +42,7 @@ def train_RandomForest(X, y,
 
         RF = RandomForestRegressor if regression else RandomForestClassifier
 
-        RF = RF(n_estimators             =  1000 ,
+        RF = RF(n_estimators             =  700 ,
                 max_features             =  'sqrt',
                 max_depth                =  14,
                 min_weight_fraction_leaf =  0.05,
@@ -50,9 +50,9 @@ def train_RandomForest(X, y,
                 )
 
         if param_grid is None:  param_grid =    {
-                                                        'max_depth':                [  2,  4,   16     ],
-                                                        'min_weight_fraction_leaf': [ 0.05,     0.1    ],
-                                                        }
+                                                'max_depth':                [  2,  4,   16     ],
+                                                'min_weight_fraction_leaf': [ 0.05,     0.1    ],
+                                                }
 
         fit_args = { } # no additional arguments for sklearn's fitting method
 
@@ -103,6 +103,7 @@ def train_RandomForest(X, y,
                             scoring      =  scoring,
                             cv           =  cv,
                             refit        =  True,
+                            n_jobs       =  -1, 
                             verbose      =  verbose,
                             error_score  = 'raise',
                             )
