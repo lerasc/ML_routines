@@ -42,7 +42,7 @@ def train_RandomForest(X, y,
 
         RF = RandomForestRegressor if regression else RandomForestClassifier
 
-        RF = RF(n_estimators             =  700 ,
+        RF = RF(n_estimators             =  800 ,
                 max_features             =  'sqrt',
                 max_depth                =  14,
                 min_weight_fraction_leaf =  0.05,
@@ -50,6 +50,7 @@ def train_RandomForest(X, y,
                 )
 
         if param_grid is None:  param_grid =    {
+                                                'max_features':             [ 'sqrt',  0.5     ], 
                                                 'max_depth':                [  2,  4,   16     ],
                                                 'min_weight_fraction_leaf': [ 0.05,     0.1    ],
                                                 }
@@ -64,7 +65,7 @@ def train_RandomForest(X, y,
                 n_estimators        =  100,                 # chose large but use early stopping
                 max_depth           =  14,                  # for regression, can be deep
                 learning_rate       =  0.01,                # ignored for boosting_type='rf'
-                gamma               =  0.1,                 #
+                gamma               =  0.1,                 # regularization parameter
                 colsample_bytree    =  0.5,                 # features to select
                 subsample           =  0.7,                 # LGBM doesn't sample with replacement
                 n_jobs              =  -1,                  # use all available ressources
