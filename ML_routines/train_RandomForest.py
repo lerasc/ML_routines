@@ -6,6 +6,7 @@ from xgboost                  import XGBRegressor,          XGBClassifier
 from sklearn.ensemble         import RandomForestRegressor, RandomForestClassifier
 from sklearn.model_selection  import train_test_split, KFold, GridSearchCV
 
+
 def train_RandomForest(X, y,
                        regression   = True,
                        boost        = False,
@@ -50,7 +51,7 @@ def train_RandomForest(X, y,
                 )
 
         if param_grid is None:  param_grid =    {
-                                                'max_features':             [ 'sqrt',  0.5     ], 
+                                                # 'max_features':             [ 'sqrt',  0.5     ], 
                                                 'max_depth':                [  2,  4,   16     ],
                                                 'min_weight_fraction_leaf': [ 0.05,     0.1    ],
                                                 }
