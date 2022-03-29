@@ -18,7 +18,7 @@ def form_all_combinations( args ):
     return lo_args
     
 
-def get_fpath( subdir=None, ROOT='', create=False, error='raise' ):
+def get_path(subdir=None, ROOT='', create=False, error='raise'):
     """
     Savely return and/or create a (sub-) path to a git repo. 
 
