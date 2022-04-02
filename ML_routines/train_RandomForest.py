@@ -63,22 +63,23 @@ def train_RandomForest(X, y,
         RF =  XGBRegressor if regression else XGBClassifier
 
         RF = RF(booster             = 'gbtree',             # what method to use
-                n_estimators        =  100,                 # chose large but use early stopping
+                objective           = 'reg:squarederror',   # typical regression metric
+                n_estimators        =  500,                 # chose large but use early stopping
                 max_depth           =  14,                  # for regression, can be deep
-                learning_rate       =  0.01,                # ignored for boosting_type='rf'
-                gamma               =  0.1,                 # regularization parameter
-                colsample_bytree    =  0.5,                 # features to select
-                subsample           =  0.7,                 # LGBM doesn't sample with replacement
+                learning_rate       =  0.1,                 # ignored for boosting_type='rf'
+                gamma               =  0.0,                 # regularization parameter
+                colsample_bytree    =  0.3,                 # features to select
+                subsample           =  0.5,                 # LGBM doesn't sample with replacement
                 n_jobs              =  -1,                  # use all available ressources
                 verbosity           =   0,
                 silent              =   True,
                 )
 
         if param_grid is None: param_grid =    {
-                                                        'max_depth':          [  2, 4, 10                     ],
-                                                        'learning_rate':      [  0.01, 0.1,  0.3              ],
-                                                        'gamma':              [  0.0,  0.1,  4                ],
-                                                        }
+                                                'max_depth':          [  6, 15             ],
+                                                'learning_rate':      [  0.01, 0.05        ],
+                                                'gamma':              [  0.0,  0.1         ],
+                                                }
 
         # Rather than fixing n_estimators (i.e. n_boosting_rounds) to a decently small value, we instead stop the
         # training based on an early stopping criteria.
@@ -89,12 +90,13 @@ def train_RandomForest(X, y,
         # [1] https://www.kaggle.com/yantiz/xgboost-gridsearchcv-with-early-stopping-supported
         # [2] https://discuss.xgboost.ai/t/how-to-do-early-stopping-with-scikit-learns-gridsearchcv/151
         ################################################################################################################
-        X, X_stop, y, y_stop = train_test_split( X, y, test_size=0.05 )
+        X, X_stop, y, y_stop = train_test_split( X, y, test_size=0.1 )
 
         fit_args = {"early_stopping_rounds":    6,
                     "eval_set":                 [[X_stop, y_stop]],
                     "verbose":                  False,
                     }
+
 
     # cross-validation
     ####################################################################################################################
@@ -125,6 +127,7 @@ def train_RandomForest(X, y,
     log      += '\n\nscore per combination:\n'
 
     for mean, std, params in zip(means, stds, params): log += "\n%0.3f (+/-%0.03f) for %r" % (mean, std, params)
+
     if verbose: print(log)
 
     if full_ret: return RF, grid, log
