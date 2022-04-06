@@ -48,12 +48,12 @@ def tensorflow_shutup( ):
 
 
 def train_NeuralNet( X, y,
-                     architecture ='FFNN',
-                     regression  =  True,
-                     cv          =  None,
-                     param_grid  =  None,
-                     verbose     =  True,
-                     full_ret    =  False
+                     architecture = 'FFNN',
+                     regression   =  True,
+                     cv           =  None,
+                     param_grid   =  None,
+                     verbose      =  True,
+                     full_ret     =  False
                      ):
     """
     Generate, train and return a basic neural net. Here, 'basic' is meant in two senses. First, the models are basic
@@ -174,7 +174,7 @@ def train_NeuralNet( X, y,
     # We stop training once we don't improve on cross-validation data. Since we already use cross-validation data below
     # to test different architectures, here we reserve some 'stopping data' that we use for early stopping.
     ####################################################################################################################
-    X, X_stop, y, y_stop = train_test_split( X, y, test_size=0.05 )
+    X, X_stop, y, y_stop = train_test_split( X, y, test_size=0.1 )
 
     es  = EarlyStopping(monitor              = 'val_mse' if regression else 'val_loss',
                         patience             =  5,
@@ -205,10 +205,9 @@ def train_NeuralNet( X, y,
                     **fit_args, # call-back
                    )
 
-    scoring  = 'neg_mean_squared_error' if regression else 'f1'
     grid     = GridSearchCV(   estimator    =  model,
                                param_grid   =  param_grid,
-                               scoring      =  scoring,
+                               scoring      =  'neg_mean_squared_error' if regression else 'f1',
                                cv           =  KFold(n_splits=5) if cv is None else cv,
                                refit        =  False, # we fit again below, to get the history
                                n_jobs       =  -1, 
