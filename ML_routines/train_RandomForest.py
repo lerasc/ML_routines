@@ -8,7 +8,8 @@ from sklearn.model_selection  import train_test_split, KFold, GridSearchCV
 
 
 def train_RandomForest(X, y,
-                       regression   = True,
+                       sw           = None, 
+                       regression   = True,                       
                        boost        = False,
                        cv           = None,
                        param_grid   = None,
@@ -20,6 +21,7 @@ def train_RandomForest(X, y,
 
     :param X:           The input features (rows are datapoints, columns are features).
     :param y:           The targets.
+    :param sw:          Sample weight.  
     :param regression:  If True, run a regressor, else a classifier.
     :param boost:       It True, run XGboost rather than a Random Forest.
     :param cv:          Cross-validation instance (use 5-fold if set to None).
@@ -56,8 +58,7 @@ def train_RandomForest(X, y,
                                                 'min_weight_fraction_leaf': [ 0.05,     0.1    ],
                                                 }
 
-        if regression:  fit_args = { 'sample_weight': y.abs()**2 } # large targets should be weighted more
-        else:           fit_args = { } # if needed, could pass sample weights externally
+        fit_args = { 'sample_weight': sw} 
 
     else:
 
@@ -96,6 +97,7 @@ def train_RandomForest(X, y,
         fit_args = {"early_stopping_rounds":    6,
                     "eval_set":                 [[X_stop, y_stop]],
                     "verbose":                  False,
+                    "sample_weight":            sw if sw is None else sw.reindex( X.index ), 
                     }
 
 
