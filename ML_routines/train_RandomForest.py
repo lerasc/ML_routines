@@ -56,7 +56,8 @@ def train_RandomForest(X, y,
                                                 'min_weight_fraction_leaf': [ 0.05,     0.1    ],
                                                 }
 
-        fit_args = { 'sample_weight': y.abs() } # large targets should be weighted more
+        if regression:  fit_args = { 'sample_weight': y.abs()**2 } # large targets should be weighted more
+        else:           fit_args = { } # if needed, could pass sample weights externally
 
     else:
 
@@ -75,11 +76,11 @@ def train_RandomForest(X, y,
                 silent              =   True,
                 )
 
-        if param_grid is None: param_grid =    {
-                                                'max_depth':          [  6, 15             ],
-                                                'learning_rate':      [  0.01, 0.05        ],
-                                                'gamma':              [  0.0,  0.1         ],
-                                                }
+        if param_grid is None: param_grid =  {
+                                              'max_depth':          [  6, 15             ],
+                                              'learning_rate':      [  0.01, 0.05        ],
+                                              'gamma':              [  0.0,  0.1         ],
+                                             }
 
         # Rather than fixing n_estimators (i.e. n_boosting_rounds) to a decently small value, we instead stop the
         # training based on an early stopping criteria.
