@@ -92,7 +92,7 @@ def train_RandomForest(X, y,
         # [1] https://www.kaggle.com/yantiz/xgboost-gridsearchcv-with-early-stopping-supported
         # [2] https://discuss.xgboost.ai/t/how-to-do-early-stopping-with-scikit-learns-gridsearchcv/151
         ################################################################################################################
-        X, X_stop, y, y_stop = train_test_split( X, y, test_size=0.1 )
+        X, X_stop, y, y_stop = train_test_split( X, y, test_size=0.1, shuffle=False ) # don't shuffle, avoid leakage
 
         fit_args = {"early_stopping_rounds":    6,
                     "eval_set":                 [[X_stop, y_stop]],

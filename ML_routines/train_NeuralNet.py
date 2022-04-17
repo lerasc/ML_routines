@@ -142,16 +142,15 @@ def train_NeuralNet( X, y,
         elif architecture== 'FFNN':
 
             model.add( layers.BatchNormalization()  )
-            model.add( layers.Dense(   units=units,    activation='relu', input_shape=(nfeat,) ))            
-            model.add( layers.BatchNormalization()  )
+            model.add( layers.Dense(   units=nfeat,    activation='relu', input_shape=(nfeat,) ))            
             model.add( layers.Dropout( rate=rate  ) )
 
-            model.add( layers.Dense(   units=units//2, activation='relu', ))
-            model.add( layers.BatchNormalization()  )
+            model.add( layers.Dense(   units=nfeat//2, activation='relu', ))
             model.add( layers.Dropout( rate=rate  ) )
 
-            model.add( layers.Dense(   units=units//4, activation='relu', ))
-            model.add( layers.BatchNormalization() ) 
+            model.add( layers.Dense(   units=nfeat//4, activation='relu', ))
+
+            model.add( layers.Dense(   units=nfeat//8, activation='relu', ))
 
         else:
 
@@ -174,11 +173,11 @@ def train_NeuralNet( X, y,
     # We stop training once we don't improve on cross-validation data. Since we already use cross-validation data below
     # to test different architectures, here we reserve some 'stopping data' that we use for early stopping.
     ####################################################################################################################
-    X, X_stop, y, y_stop = train_test_split( X, y, test_size=0.1 )
+    X, X_stop, y, y_stop = train_test_split( X, y, test_size=0.1, shuffle=False ) # don't shuffle, avoid leakage
 
     es  = EarlyStopping(monitor              = 'val_mse' if regression else 'val_loss',
-                        patience             =  5,
-                        min_delta            =  1e-4,
+                        patience             =  10,
+                        min_delta            =  1e-2,
                         restore_best_weights =  True,
                         verbose              =  True,
                         )
@@ -195,8 +194,8 @@ def train_NeuralNet( X, y,
     if param_grid is None:
 
         param_grid = {
-                      'units': [ 50,  100,  200  ],
-                      'rate':  [ 0.0, 0.1,   0.4 ],
+                      'units': [ 100             ],
+                      'rate':  [ 0.0, 0.1,   0.2 ],
                      }
 
     wrap  = KerasRegressor if regression else KerasClassifier
@@ -208,7 +207,7 @@ def train_NeuralNet( X, y,
     grid     = GridSearchCV(   estimator    =  model,
                                param_grid   =  param_grid,
                                scoring      =  'neg_mean_squared_error' if regression else 'f1',
-                               cv           =  KFold(n_splits=5) if cv is None else cv,
+                               cv           =  KFold(n_splits=3) if cv is None else cv,
                                refit        =  False, # we fit again below, to get the history
                                n_jobs       =  -1, 
                                verbose      =  5 if verbose else 0,                               
