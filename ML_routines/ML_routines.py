@@ -6,7 +6,7 @@ import seaborn as sb
 from sklearn.metrics  import accuracy_score, f1_score, confusion_matrix, roc_curve, roc_auc_score
 
 
-def plot_confusion_matrix( y_true, y_pred, ax, labels=None, **kwargs ):
+def plot_confusion_matrix( y_true, y_pred, ax, labels=None ):
     """
     Plot a binary confusion matrix. 
     This function is an adaptation from [1]. It is currently restricted to binary classification.
@@ -15,7 +15,6 @@ def plot_confusion_matrix( y_true, y_pred, ax, labels=None, **kwargs ):
     :param y_pred:  list of predicted labels
     :param ax:      axis instance to plot into 
     :param labels:  labels argument is passed on to confusion matrix
-    :param kwargs:  additional arguments for confusion_matrix
 
 
     [1] http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html#sphx-glr-auto-
@@ -74,28 +73,90 @@ def plot_ROC_curve( y_true, y_pred, ax, **kwargs ):
     ax.set_ylabel('true positive rate')    
 
 
-def balanced_downsample( X, target='target' ):
+def balanced_downsample( X, target='target', classification=True, center=0, nr_bins=25  ):
     """
+    For many ML tasks, it is important to have a balanced set of targets. For classification, this means the same number
+    of data-points in each class. For regression, this generalizes to having the same number of datapoints in each
+    positive and negative quantile-bin. This function balances data accordingly.
+
     Given a feature frame X, downsample all targets to the minority class.
 
-    :param X:           input DataFrame with features
-    :param target:      name of the two target column
+    :param X:               input DataFrame with features
+
+    :param target:          name of the target column
+
+    :param classification:  If True,  the target column is assumed to be an (ordinal) set of targets for classfication.
+                            If False, the target column is assumed to be a continous set of targets for regression.
+
+    :param center:          This argument is only needed if classification=False. It specifies the center-point of the
+                            distribution around which the data is to be distributed. The function then adds the same
+                            number of data-points to the quantile-bins on each side of the center. So for instance,
+                            if center=0, there will be the same amount of data in the interval (-1,0) and the interval
+                            (0,1). The same amount of data in the interval (-2,-1) as in (1,2), and so forth.
+
+    :param nr_bins:         Specifies the number of quantile bins (only needed if classification=False).
     """
 
+    # check input
+    ####################################################################################################################
+    assert isinstance(X, pd.DataFrame), 'X must be DataFrame'
     assert target in X.columns, f'target column {target} is missing'
+    assert isinstance(classification, bool), 'classification must be bool '
+    if not classification: assert not X.index.duplicated().any(), 'for regression, index must be unique'
 
-    counts = X[target].value_counts()               # count all target values
-    n      = counts.min()                           # target value with least data
-    Xs     = []                                     # stores sub-frames of each target value
+    # balancing classification labels is straightforward: downsample all classes to the one with least data
+    ####################################################################################################################
+    if classification:
 
-    for _, df in X.groupby(target):                 # group by target
+        counts = X[target].value_counts()               # count all target values
+        n      = counts.min()                           # target value with least data
+        Xs     = []                                     # stores sub-frames of each target value
 
-        sdf  = df.sample( n=n, replace=False )      # downsample to the minority class
-        Xs  += [sdf]                                # collect
+        for _, df in X.groupby(target):                 # group by target
 
-    X = pd.concat(Xs, axis='index')                 # concatenate
-    X = X.sample( frac=1, replace=False )           # shuffle
+            sdf  = df.sample( n=n, replace=False )      # downsample to the minority class
+            Xs  += [sdf]                                # collect
+
+        X = pd.concat(Xs, axis='index')                 # concatenate
+        X = X.sample( frac=1, replace=False )           # shuffle
+
+        return X
+
+    # Balancing regression targets is slightly more involved. Here, we consider the target as distributed around a
+    # center. Then, we make sure that the maximum and minimum value have the same distance from the center by clipping
+    # the largest values. Subsequently, we look at quantile bins and make sure that in each bin, there is the same
+    # number of data-points with positive and negative sign. We neatly make use of a recursive call to this function.
+    ####################################################################################################################
+    nX              = X.copy(deep=True)                                 # don't change original DataFrame
+    nX[target]      = nX[target] - center                               # remove mean to balance at 0
+    Y               = nX[target].copy()                                 # create new Series
+    Min, Max        = Y.min(), Y.max()                                  # largest deviations from center point
+
+    assert Min < 0 and Max > 0, 'center must be between largest and smallest data-point'
+
+    clip            = min( abs(Min), Max )                              # where to clip the largest values
+    Y               = Y.clip(-clip, clip)                               # now max deviation from center is equal
+
+    Y               = Y.to_frame()                                      # make into DataFrame
+    Y['abs_target'] =          Y['target'].abs()                        # take absolute values
+    Y['sgn_target'] = np.sign( Y['target'] )                            # sign: deviation from center
+    Y['bin']        = pd.cut(  Y['abs_target'], bins=nr_bins  )         # assign to quantile-bins
+    new_X           = []                                                # stores the new values
+
+    for _, sY in Y.groupby('bin'):                                      # iterate targets by bin
+
+        nv =  sY['sgn_target'].value_counts()                           # number of values per sign
+        assert len(nv) > 0, 'nr_bins must be reduced'                   # bin contains only negative/positive values
+
+        sY = balanced_downsample( X               = sY,                 # recursive call
+                                  target         ='sgn_target',         # balance the sign in each bin
+                                  classification = True,                # treat as discrete
+                                  )
+
+        sX     = nX.reindex(sY.index)                                   # select related X data (index must be unique!)
+        new_X += [ sX ]                                                 # append to list
+
+    X = pd.concat(new_X, axis='index')                                  # stack back together
 
     return X
-
     
