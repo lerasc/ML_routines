@@ -53,12 +53,11 @@ def train_RandomForest(X, y,
                 )
 
         if param_grid is None:  param_grid =    {
-                                                'max_features':             [ 'sqrt',  0.5     ], 
                                                 'max_depth':                [  2,  4,   16     ],
-                                                'min_weight_fraction_leaf': [ 0.05,     0.1    ],
+                                                'min_weight_fraction_leaf': [ 0.01,     0.05   ],
                                                 }
 
-        fit_args = { 'sample_weight': sw} 
+        fit_args = { 'sample_weight': sw } 
 
     else:
 
