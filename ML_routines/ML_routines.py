@@ -156,7 +156,12 @@ def balanced_downsample( X, target='target', classification=True, center=0, nr_b
         sX     = nX.reindex(sY.index)                                   # select related X data (index must be unique!)
         new_X += [ sX ]                                                 # append to list
 
-    X = pd.concat(new_X, axis='index')                                  # stack back together
+    new_X = pd.concat(new_X, axis='index')                              # stack back together
+
+    # Rearange index of new data back to index of original index, so that the ordering (e.g. in time-series data)
+    # states the same.
+    ####################################################################################################################
+    new_X = new_X.reindex( X.index ).dropna( )
 
     return X
     
