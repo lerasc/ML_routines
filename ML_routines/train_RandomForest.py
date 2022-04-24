@@ -52,10 +52,11 @@ def train_RandomForest(X, y,
                 n_jobs                   =  -1
                 )
 
-        if param_grid is None:  param_grid =    {
-                                                'max_depth':                [  2,  4,   16     ],
-                                                'min_weight_fraction_leaf': [ 0.01,     0.05   ],
-                                                }
+        if param_grid is None: 
+
+            param_grid =    {
+                            'min_weight_fraction_leaf': [  0.1, 0.05, 0.01, 0.005, 0.001, 0.0001  ],
+                            }            
 
         fit_args = { 'sample_weight': sw } 
 

@@ -136,6 +136,7 @@ def balanced_downsample( X, target='target', classification=True, center=0, nr_b
 
     clip            = min( abs(Min), Max )                              # where to clip the largest values
     Y               = Y.clip(-clip, clip)                               # now max deviation from center is equal
+    nX[target]      = nX[target].clip(-clip, clip)                      # also need to clip target
 
     Y               = Y.to_frame()                                      # make into DataFrame
     Y['abs_target'] =          Y['target'].abs()                        # take absolute values
@@ -145,8 +146,8 @@ def balanced_downsample( X, target='target', classification=True, center=0, nr_b
 
     for _, sY in Y.groupby('bin'):                                      # iterate targets by bin
 
-        nv =  sY['sgn_target'].value_counts()                           # number of values per sign
-        assert len(nv) > 0, 'nr_bins must be reduced'                   # bin contains only negative/positive values
+        nv = len(sY['sgn_target'].value_counts())                       # number of distinct values
+        assert nv==2, 'nv should have 2 values.'                        # should be two 
 
         sY = balanced_downsample( X               = sY,                 # recursive call
                                   target         ='sgn_target',         # balance the sign in each bin
@@ -163,5 +164,5 @@ def balanced_downsample( X, target='target', classification=True, center=0, nr_b
     ####################################################################################################################
     new_X = new_X.reindex( X.index ).dropna( )
 
-    return X
+    return new_X
     

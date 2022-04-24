@@ -63,9 +63,8 @@ def train_NeuralNet( X, y,
     :param X:               The input features (rows are datapoints, columns are features).
     :param y:               The targets.
     :param architecture:    What neural net architecture to use:
-                            - 'LSTM':   train a basic LSTM network
-                            - 'CONV':   train a basic convolutional layer
                             - 'FFNN':   train a basic feed forward neural net
+                            - 'CONV':   train a basic convolutional layer                            
     :param regression:      If True, train a regression, else train a binary classifier.
     :param cv:              Cross-validation instance (use 5-fold if set to None).
     :param param_grid:      Parameter combinations to test (use default ones if None).
@@ -107,12 +106,19 @@ def train_NeuralNet( X, y,
 
         # adjust network topology to architecture specifics
         ################################################################################################################
-        if architecture=='LSTM':
+        if architecture== 'FFNN':
 
-            model.add( layers.LSTM(units        =  units,
-                                   dropout      =  rate,
-                                   input_shape  = (nfeat, nfeat),
-                                   ))
+            model.add( layers.BatchNormalization()  )
+            model.add( layers.Dense(   units=nfeat,    activation='relu', input_shape=(nfeat,) ))            
+            model.add( layers.Dropout( rate=rate  ) )
+
+            model.add( layers.Dense(   units=nfeat//2, activation='relu', ))
+            model.add( layers.Dropout( rate=rate  ) )
+
+            model.add( layers.Dense(   units=nfeat//4, activation='relu', ))
+
+            model.add( layers.Dense(   units=nfeat//8, activation='relu', ))
+
 
         elif architecture== 'CONV':
 
@@ -138,19 +144,6 @@ def train_NeuralNet( X, y,
 
             model.add( layers.Flatten() )
             model.add( layers.Dropout(rate) )
-
-        elif architecture== 'FFNN':
-
-            model.add( layers.BatchNormalization()  )
-            model.add( layers.Dense(   units=nfeat,    activation='relu', input_shape=(nfeat,) ))            
-            model.add( layers.Dropout( rate=rate  ) )
-
-            model.add( layers.Dense(   units=nfeat//2, activation='relu', ))
-            model.add( layers.Dropout( rate=rate  ) )
-
-            model.add( layers.Dense(   units=nfeat//4, activation='relu', ))
-
-            model.add( layers.Dense(   units=nfeat//8, activation='relu', ))
 
         else:
 
