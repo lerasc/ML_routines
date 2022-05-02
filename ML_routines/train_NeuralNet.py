@@ -109,8 +109,7 @@ def train_NeuralNet( X, y,
         if architecture== 'FFNN':
 
             model.add( layers.BatchNormalization()  )
-            model.add( layers.Dense(   units=nfeat,    activation='relu', input_shape=(nfeat,) ))            
-            model.add( layers.Dropout( rate=rate  ) )
+            model.add( layers.Dense(   units=nfeat,    activation='relu', input_shape=(nfeat,) ))
 
             model.add( layers.Dense(   units=nfeat//2, activation='relu', ))
             model.add( layers.Dropout( rate=rate  ) )
@@ -177,7 +176,7 @@ def train_NeuralNet( X, y,
 
     fit_args =  {
                 'epochs'          : 100, # just make it large enough, since we use early stopping
-                'batch_size'      : 40,
+                'batch_size'      : 60,
                 'validation_data' : (X_stop, y_stop),
                 'callbacks'       : [es],
                 }

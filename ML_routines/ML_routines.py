@@ -84,7 +84,7 @@ def balanced_downsample( X, target='target', classification=True, center=0, nr_b
     :param X:               input DataFrame with features
 
     :param target:          name of the target column
-
+`
     :param classification:  If True,  the target column is assumed to be an (ordinal) set of targets for classfication.
                             If False, the target column is assumed to be a continous set of targets for regression.
 
@@ -147,7 +147,10 @@ def balanced_downsample( X, target='target', classification=True, center=0, nr_b
     for _, sY in Y.groupby('bin'):                                      # iterate targets by bin
 
         nv = len(sY['sgn_target'].value_counts())                       # number of distinct values
-        assert nv==2, 'nv should have 2 values.'                        # should be two 
+        try: assert nv==2, 'nv should have 2 values.'                        # should be two 
+        except: 
+            from pdb import set_trace
+            set_trace()
 
         sY = balanced_downsample( X               = sY,                 # recursive call
                                   target         ='sgn_target',         # balance the sign in each bin
