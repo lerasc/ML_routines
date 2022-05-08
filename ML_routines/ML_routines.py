@@ -3,7 +3,7 @@ import numpy   as np
 import pandas  as pd
 import seaborn as sb
 
-from sklearn.metrics  import accuracy_score, f1_score, confusion_matrix, roc_curve, roc_auc_score
+from sklearn.metrics  import accuracy_score, f1_score, confusion_matrix, roc_curve, roc_auc_score, mean_squared_error
 
 
 def plot_confusion_matrix( y_true, y_pred, ax, labels=None ):
@@ -70,7 +70,33 @@ def plot_ROC_curve( y_true, y_pred, ax, **kwargs ):
     ax.text( x=0.1, y=0.8, s=score, fontsize=10 )    
 
     ax.set_xlabel('false positive rate')
-    ax.set_ylabel('true positive rate')    
+    ax.set_ylabel('true positive rate')
+
+
+def subsample_score( y_true, y_pred, score='rmse', ns=100  ):
+    """
+    Rather than returning one score, return a sub-sampled average score and associated standard deviation.
+
+    :param y_true:  Pandas Series of targets.
+    :param y_pred:  Pandas Series of predicted values
+    :param score:   What score to use. Default is 'rmse' but can by any function that takes as input y_true and y_pred.
+    :param ns:      Number of times to sub-sample.
+    """
+
+    if score is not callable:
+        assert score=='rmse', "if score is not a function, it must be 'rmse'"
+        score = lambda true, pred: np.sqrt( mean_squared_error(true,pred) )
+
+
+    true    = y_true.rename('true')
+    pred    = y_pred.rename('pred')
+    df      = pd.concat([true,pred], axis=1)
+    samples = [ df.sample(frac=0.5, replace=True).dropna() for _ in range(ns) ]
+    vals    = [ score(sdf['true'], sdf['pred']) for sdf in samples ]
+    mean    = np.nanmean(vals)
+    std     = np.nanstd(vals)
+
+    return mean, std
 
 
 def balanced_downsample( X, target='target', classification=True, center=0, nr_bins=25  ):

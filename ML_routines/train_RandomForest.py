@@ -6,7 +6,6 @@ from xgboost                  import XGBRegressor,          XGBClassifier
 from sklearn.ensemble         import RandomForestRegressor, RandomForestClassifier
 from sklearn.model_selection  import train_test_split, KFold, GridSearchCV
 
-
 def train_RandomForest(X, y,
                        sw           = None, 
                        regression   = True,                       
@@ -25,6 +24,7 @@ def train_RandomForest(X, y,
     :param regression:  If True, run a regressor, else a classifier.
     :param boost:       It True, run XGboost rather than a Random Forest.
     :param cv:          Cross-validation instance (use 5-fold if set to None).
+    :param param_grid:  Parameter combinations to test (use default ones if None).
     :param verbose:     If True, print results. Else, return only as log-file
     :param full_ret:    If True, return more than just the trained NN (cf. return arguments)
 
@@ -55,10 +55,10 @@ def train_RandomForest(X, y,
         if param_grid is None: 
 
             param_grid =    {
-                            'min_weight_fraction_leaf': [  0.1, 0.05, 0.01, 0.005, 0.001, 0.0001  ],
+                            'min_weight_fraction_leaf': [  0.001, 0.005, 0.01, 0.02, 0.05  ],
                             }            
 
-        fit_args = { 'sample_weight': sw } 
+        fit_args = { 'sample_weight':sw } 
 
     else:
 
@@ -78,9 +78,8 @@ def train_RandomForest(X, y,
                 )
 
         if param_grid is None: param_grid =  {
-                                              'max_depth':          [  6, 15             ],
-                                              'learning_rate':      [  0.01, 0.05        ],
-                                              'gamma':              [  0.0,  0.1         ],
+                                              'max_depth':          [  6, 12,            ],
+                                              'learning_rate':      [  0.01, 0.05, 0.1   ],
                                              }
 
         # Rather than fixing n_estimators (i.e. n_boosting_rounds) to a decently small value, we instead stop the
@@ -89,17 +88,20 @@ def train_RandomForest(X, y,
         # we need to reserve some extra data just for the early stopping.  There is, however, some code which would
         # allow us to adjust for this issue, see for instance [1,2]. But that code is not compatible with scikit-
         # learns CV-class. I thus keep things simple, and reserve a bit of data for the stopping criteria.
+        # Note: we don't shuffle in the train-test split, to minimize the leakage.
         # [1] https://www.kaggle.com/yantiz/xgboost-gridsearchcv-with-early-stopping-supported
         # [2] https://discuss.xgboost.ai/t/how-to-do-early-stopping-with-scikit-learns-gridsearchcv/151
         ################################################################################################################
-        X, X_stop, y, y_stop = train_test_split( X, y, test_size=0.1, shuffle=False ) # don't shuffle, avoid leakage
+        if sw is None:
+            X, X_stop, y, y_stop              = train_test_split( X, y,     test_size=0.1, shuffle=False )
+        else:
+            X, X_stop, y, y_stop, sw, sw_stop = train_test_split( X, y, sw, test_size=0.1, shuffle=False )
 
         fit_args = {"early_stopping_rounds":    6,
                     "eval_set":                 [[X_stop, y_stop]],
                     "verbose":                  False,
-                    "sample_weight":            sw if sw is None else sw.reindex( X.index ), 
+                    "sample_weight":            sw,
                     }
-
 
     # cross-validation
     ####################################################################################################################
