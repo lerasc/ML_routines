@@ -39,8 +39,8 @@ def train_Reservoir(X, y,
     ####################################################################################################################
     def initialize_reservoir( units=50, lr=0.1, sr=0.5, ridge=1e-2, feedback=True ):
 
-        reservoir = Reservoir( units=params['units'], lr=params['lr'], sr=params['sr'] )
-        readout   = Ridge( output_dim=1, ridge=params['ridge'] )
+        reservoir = Reservoir( units=units, lr=lr, sr=sr )
+        readout   = Ridge( output_dim=1, ridge=ridge )
 
         if feedback: reservoir <<= readout # feedback connection
 
@@ -50,17 +50,15 @@ def train_Reservoir(X, y,
 
     # form all parameter combinations and train-test split
     ####################################################################################################################
-    if param_grid is None:
+    if param_grid is None:param_grid = {
+                                        'units' :   [ 30,   40    ],
+                                        'lr'    :   [ 0.1,  0.5   ],
+                                        'sr'    :   [ 0.9,  1.1   ],
+                                        'ridge' :   [ 1e-2        ],
+                                        'feedback': [ False       ],
+                                        }
 
-        param_grid = {
-                    'units' :   [ 50, 100, 200, 400 ],
-                    'lr'    :   [ 0.1, 0.3, 0.5     ],
-                    'sr'    :   [ 0.25, 0.9, 1.1, 2 ],
-                    'ridge' :   [ 1e-3, 1e-2, 1e-1  ],
-                    'feedback': [True, False]
-                    }
-
-        param_grid = form_all_combinations(param_grid)
+    param_grid = form_all_combinations(param_grid)
 
     X_train, X_test, y_train, y_test = train_test_split( X, y,  test_size=frac, shuffle=False )
 
@@ -101,19 +99,19 @@ def train_Reservoir(X, y,
     res    = pd.DataFrame(res, columns=cols)                    # merge into a Frame
     params = pd.DataFrame( param_grid )                         # parameters as frame
     res    = pd.concat([params, res], axis=1)                   # merge together
-    best   = res['OS_rmse'].idxmax()                            # index of best parameter combination
+    best   = res['OS_rmse'].idxmin()                            # index of best parameter combination
     res    = res.sort_values( by='OS_rmse', ascending=True )    # lowest OS rmse first
 
     # retrain on best parameter combination
     ####################################################################################################################
     best_params = param_grid[best] # works because res DataFrame has same index as .iloc
 
-    esn_model   = initialize_reservoir( units   = best_params['units'],
-                                      lr        = best_params['lr'],
-                                      sr        = best_params['sr'],
-                                      ridge     = best_params['ridge'],
-                                      feedback  = best_params['feedback']
-                                      )
+    esn_model   = initialize_reservoir(units     = best_params['units'],
+                                       lr        = best_params['lr'],
+                                       sr        = best_params['sr'],
+                                       ridge     = best_params['ridge'],
+                                       feedback  = best_params['feedback']
+                                       )
 
     esn_model   = esn_model.fit( X      = X.values,
                                  Y      = y.values.reshape(-1,1),
@@ -133,7 +131,7 @@ def train_Reservoir(X, y,
             """
             Predict data for feature values X.
             """
-            pred = esn_model.run( X.values )
+            pred = self.__esn.run( X.values )
             pred = pred.squeeze()
 
             return pred
