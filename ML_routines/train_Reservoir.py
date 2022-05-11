@@ -2,7 +2,7 @@
 import pandas      as pd
 import reservoirpy as rpy
 
-from reservoirpy.nodes              import Reservoir, Ridge
+from reservoirpy.nodes              import NVAR, Ridge
 from sklearn.model_selection        import train_test_split
 
 from ML_routines.ML_routines        import subsample_score
@@ -15,17 +15,25 @@ def train_Reservoir(X, y,
                     full_ret     = False,
                     ):
     """
-    Train a reservoir echo state network.
+    Train a reservoir echo state network. But rather than actually training an echo state, we train a Non-linear Vector
+    AutoRegressive machine (NVAR) as presented in [1]. As argued in [1], NVAR work better than traditional reservoir
+    computers. But moreover, it requires many less hyper-parameters to tune.
 
     :param X:           The input features (rows are datapoints, columns are features).
     :param y:           The targets.
     :param frac:        Fraction of test data.
     :param param_grid:  Parameter combinations to test (use default ones if None).
     :param verbose:     If True, print results. Else, return only as log-file
+    :param full_ret:    If True, return not just the instance, but also
 
-    :return ESN:        trained echo state network, with predict method.
-    :return esn_model:  original reservoirpy instance without predict method
-    :return res:        DataFrame with results for each parameter combination
+    :return ESN:        trained echo state network, with predict method
+    :return esn_model:  original reservoirpy instance without predict method (if full_ret=True)
+    :return res:        DataFrame with results for each parameter combination (if full_ret=True)
+
+    references:
+    ----------
+    [1] Gauthier, D. J., Bollt, E., Griffith, A., & Barbosa, W. A. S. (2021). 
+        Next generation reservoir computing. Nature Communications, 12(1), 5564.
     """
 
     # check input
@@ -37,29 +45,25 @@ def train_Reservoir(X, y,
 
     # implement reservoir routine
     ####################################################################################################################
-    def initialize_reservoir( units=50, lr=0.1, sr=0.5, ridge=1e-2, feedback=True ):
+    def initialize_reservoir( delay=2, ridge=1e-2  ):
+        """
+        Initialize NVAR with main tunable parameters.
+        """
 
-        reservoir = Reservoir( units=units, lr=lr, sr=sr )
+        nvar      = NVAR( delay=delay, order=2, strides=1 )
         readout   = Ridge( output_dim=1, ridge=ridge )
-
-        if feedback: reservoir <<= readout # feedback connection
-
-        esn_model = reservoir >>  readout
+        esn_model = nvar >>  readout
 
         return esn_model
 
     # form all parameter combinations and train-test split
     ####################################################################################################################
     if param_grid is None:param_grid = {
-                                        'units' :   [ 30,   40    ],
-                                        'lr'    :   [ 0.1,  0.5   ],
-                                        'sr'    :   [ 0.9,  1.1   ],
-                                        'ridge' :   [ 1e-2        ],
-                                        'feedback': [ False       ],
+                                        'delay' :   [ 2,    4,    6     ],
+                                        'ridge' :   [ 1e-5, 1e-3, 1e-1  ],
                                         }
 
-    param_grid = form_all_combinations(param_grid)
-
+    param_grid                       = form_all_combinations(param_grid)
     X_train, X_test, y_train, y_test = train_test_split( X, y,  test_size=frac, shuffle=False )
 
     # iterate each combination and determine score
@@ -71,19 +75,16 @@ def train_Reservoir(X, y,
 
         if verbose: print(f'training combination {i+1} out of {len(param_grid)}', end='\r')
 
-        esn_model = initialize_reservoir( units     = params['units'],
-                                          lr        = params['lr'],
-                                          sr        = params['sr'],
+        esn_model = initialize_reservoir( delay     = params['delay'],
                                           ridge     = params['ridge'],
-                                          feedback  = params['feedback']
                                           )
 
         esn_model = esn_model.fit( X      = X_train.values,
                                    Y      = y_train.values.reshape(-1,1),
-                                   warmup = 10,
+                                   warmup = 200,
                                   )
 
-        IS_pred    = esn_model.run(X_train.values, )
+        IS_pred    = esn_model.run( X_train.values )
         IS_pred    = pd.Series( IS_pred.squeeze(), index=X_train.index )
         IS_m, IS_e = subsample_score( y_train, IS_pred, score='rmse' )
 
@@ -106,11 +107,8 @@ def train_Reservoir(X, y,
     ####################################################################################################################
     best_params = param_grid[best] # works because res DataFrame has same index as .iloc
 
-    esn_model   = initialize_reservoir(units     = best_params['units'],
-                                       lr        = best_params['lr'],
-                                       sr        = best_params['sr'],
+    esn_model   = initialize_reservoir(delay     = best_params['delay'],
                                        ridge     = best_params['ridge'],
-                                       feedback  = best_params['feedback']
                                        )
 
     esn_model   = esn_model.fit( X      = X.values,
