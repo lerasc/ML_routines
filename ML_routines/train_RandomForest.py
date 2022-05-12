@@ -45,17 +45,17 @@ def train_RandomForest(X, y,
 
         RF = RandomForestRegressor if regression else RandomForestClassifier
 
-        RF = RF(n_estimators             =  800 ,
-                max_features             =  'sqrt',
-                max_depth                =  14,
-                min_weight_fraction_leaf =  0.05,
-                n_jobs                   =  -1
-                )
+        RF = RF( n_estimators             =  800 ,
+                 max_features             = 'sqrt',
+                 max_depth                =  14,
+                 min_weight_fraction_leaf =  0.05,
+                 n_jobs                   =  -1
+                 )
 
         if param_grid is None: 
 
             param_grid =    {
-                            'min_weight_fraction_leaf': [  0.001, 0.005, 0.01, 0.02, 0.05  ],
+                            'min_weight_fraction_leaf': [  0.1, 0.01, 0.005, 0.001, 0.0001 ],
                             }            
 
         fit_args = { 'sample_weight':sw } 

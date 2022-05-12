@@ -40,7 +40,7 @@ def train_Reservoir(X, y,
     ####################################################################################################################
     assert isinstance(X, pd.DataFrame), 'X must be DataFrame'
     assert isinstance(y, pd.Series),    'y must be Series'
-    assert X.shape[0]==len(y),          'X and y must be of same length '
+    assert X.index.identical(y.index),  'X and y have the same index'
     assert frac > 0 and frac < 1,       'frac must be between 0 and 1'
 
     # implement reservoir routine
@@ -59,11 +59,12 @@ def train_Reservoir(X, y,
     # form all parameter combinations and train-test split
     ####################################################################################################################
     if param_grid is None:param_grid = {
-                                        'delay' :   [ 2,    4,    6     ],
-                                        'ridge' :   [ 1e-5, 1e-3, 1e-1  ],
+                                        'delay' :   [ 1,    2,    ],
+                                        'ridge' :   [ 0.01,  0.1  ],
                                         }
 
     param_grid                       = form_all_combinations(param_grid)
+    X, y                             = X.sort_index(), y.sort_index() # make sure it is sorted
     X_train, X_test, y_train, y_test = train_test_split( X, y,  test_size=frac, shuffle=False )
 
     # iterate each combination and determine score
