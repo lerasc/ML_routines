@@ -82,7 +82,7 @@ def train_NeuralNet( X, y,
     ####################################################################################################################
     assert isinstance(X, pd.DataFrame), 'X must be DataFrame'
     assert isinstance(y, pd.Series),    'y must be Series'
-    assert X.shape[0]==len(y),          'X and y must be of same length '
+    assert X.index.identical(y.index),  'X and y have the same index'
 
     tensorflow_shutup()
 

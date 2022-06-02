@@ -1,4 +1,5 @@
 
+import numpy       as np
 import pandas      as pd
 import reservoirpy as rpy
 
@@ -11,6 +12,7 @@ from ML_routines.execution_routines import form_all_combinations
 def train_Reservoir(X, y,
                     frac         = 0.1,
                     param_grid   = None,
+                    clip         = True,
                     verbose      = False,
                     full_ret     = False,
                     ):
@@ -23,11 +25,12 @@ def train_Reservoir(X, y,
     :param y:           The targets.
     :param frac:        Fraction of test data.
     :param param_grid:  Parameter combinations to test (use default ones if None).
+    :param clip:        To use an adjusted tanh-activation function rather than the default linear one.
     :param verbose:     If True, print results. Else, return only as log-file
     :param full_ret:    If True, return not just the instance, but also
 
     :return ESN:        trained echo state network, with predict method
-    :return esn_model:  original reservoirpy instance without predict method (if full_ret=True)
+    :return esn_model:  original reservoirpy instance without predict method  (if full_ret=True)
     :return res:        DataFrame with results for each parameter combination (if full_ret=True)
 
     references:
@@ -43,14 +46,23 @@ def train_Reservoir(X, y,
     assert X.index.identical(y.index),  'X and y have the same index'
     assert frac > 0 and frac < 1,       'frac must be between 0 and 1'
 
+    # By default, we use a linear activation function. This sometimes causes massive outliers (in the out of sample
+    # prediction). Be counter-balance this by creating an adjusted tanh-activation function that clips the massive
+    # outliers.
+    ####################################################################################################################
+    lb, ub = y.quantile(0.01), y.quantile(0.99)         # upper and lower boundaries for observed training targets
+    bound  = max( abs(lb), abs(ub) )                    # whichever is larger in magnitude
+    act    = lambda x: bound * np.tanh( x/bound )       # modified acitivation to clip outlier predictions
+    act    = act if clip else None                      # None means "lambda x: x" (cf. reservoirpy git repo)
+
     # implement reservoir routine
     ####################################################################################################################
-    def initialize_reservoir( delay=2, ridge=1e-2  ):
+    def initialize_reservoir( delay=2, order=2, ridge=1e-2  ):
         """
         Initialize NVAR with main tunable parameters.
         """
 
-        nvar      = NVAR( delay=delay, order=2, strides=1 )
+        nvar      = NVAR( delay=delay, order=order, strides=1, activation_fun=act )
         readout   = Ridge( output_dim=1, ridge=ridge )
         esn_model = nvar >>  readout
 
@@ -76,9 +88,7 @@ def train_Reservoir(X, y,
 
         if verbose: print(f'training combination {i+1} out of {len(param_grid)}', end='\r')
 
-        esn_model = initialize_reservoir( delay     = params['delay'],
-                                          ridge     = params['ridge'],
-                                          )
+        esn_model = initialize_reservoir( **params )
 
         esn_model = esn_model.fit( X      = X_train.values,
                                    Y      = y_train.values.reshape(-1,1),
@@ -117,25 +127,28 @@ def train_Reservoir(X, y,
                                  warmup = 10,
                                  )
 
-    # return desired output
-    ####################################################################################################################
-    class esn_wrapper:
-        """
-        Simple wrapper around esn model to add .predict-method for consisten usage with other scikit-learn methods.
-        """
-        def __init__(self,  esn_model ):
-            self.__esn = esn_model
-
-        def predict( self, X ):
-            """
-            Predict data for feature values X.
-            """
-            pred = self.__esn.run( X.values )
-            pred = pred.squeeze()
-
-            return pred
-
-    ESN = esn_wrapper( esn_model )
+    ESN         = esn_wrapper( esn_model )
 
     if full_ret: return ESN, esn_model, res
     else:        return ESN
+
+
+class esn_wrapper:
+    """
+    Simple wrapper around esn model (cf. train_Reservoir) that adds a .predict-method for consistent usage with other
+    scikit-learn methods.
+
+    :param esn_model:   A trained instance of reservoirpy (cf. output of train_Reservoir).
+    """
+    def __init__(self,  esn_model ):
+        self.__esn = esn_model
+
+    def predict( self, X ):
+        """
+        Predict data for feature values X.
+        """
+        pred = self.__esn.run( X.values )
+        pred = pred.squeeze()
+
+        return pred
+        

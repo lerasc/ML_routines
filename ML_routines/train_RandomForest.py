@@ -2,9 +2,9 @@
 import numpy  as np
 import pandas as pd
 
-from xgboost                  import XGBRegressor,          XGBClassifier
-from sklearn.ensemble         import RandomForestRegressor, RandomForestClassifier
-from sklearn.model_selection  import train_test_split, KFold, GridSearchCV
+from sklearn.ensemble         import RandomForestRegressor,     RandomForestClassifier
+from sklearn.ensemble         import GradientBoostingRegressor, GradientBoostingClassifier
+from sklearn.model_selection  import KFold, GridSearchCV
 
 def train_RandomForest(X, y,
                        sw           = None, 
@@ -12,6 +12,7 @@ def train_RandomForest(X, y,
                        boost        = False,
                        cv           = None,
                        param_grid   = None,
+                       min_data     = None,
                        verbose      = False,
                        full_ret     = False,
                        ):
@@ -19,12 +20,14 @@ def train_RandomForest(X, y,
     Train a random forest or boosted forest including k-fold cross-validation.
 
     :param X:           The input features (rows are datapoints, columns are features).
-    :param y:           The targets.
+    :param y:           The targets (must have same index as X)
     :param sw:          Sample weight.  
     :param regression:  If True, run a regressor, else a classifier.
     :param boost:       It True, run XGboost rather than a Random Forest.
     :param cv:          Cross-validation instance (use 5-fold if set to None).
     :param param_grid:  Parameter combinations to test (use default ones if None).
+    :param min_data:    Minimum number of data points in any terminal leaf. Useful for smart min_weight_fraction_leaf
+                        (see inside code for details). If not None, it overwrite the param_grid values.
     :param verbose:     If True, print results. Else, return only as log-file
     :param full_ret:    If True, return more than just the trained NN (cf. return arguments)
 
@@ -37,78 +40,66 @@ def train_RandomForest(X, y,
     ####################################################################################################################
     assert isinstance(X, pd.DataFrame), 'X must be DataFrame'
     assert isinstance(y, pd.Series),    'y must be Series'
-    assert X.shape[0]==len(y),          'X and y must be of same length '
+    assert X.index.identical(y.index),  'X and y have the same index'
+
+    # In many regards, min_weight_fraction_leaf is one of the most important parameters, as it allows us to control the
+    # tree-depth in a very interpretable manner. However, often it is easier to interpret in absolute, rather than in
+    # relative numbers. Here we thus translate the absolute minimum number of data points in any terminal leaf into a
+    # fraction and then span a reaosnable grid of values.
+    ####################################################################################################################
+    grid = param_grid if param_grid is not None else {} # initialize as empty
+
+    if min_data is not None:
+
+        min_frac = min_data / len(X)                          # minimum fraction of data
+        max_frac = 0.1                                        # maximum fraction of data to test for
+        fracs    = np.logspace( np.log10(min_frac),           # log-spaced grid of values
+                                np.log10(max_frac),
+                                num  = 5,
+                                base = 10,
+                                )
+        fracs    = np.round( fracs, 5 )                       # just for more visual appeal
+
+        grid['min_weight_fraction_leaf'] = fracs              # over-write param_grid value, if exists
+
+    elif param_grid is None:                                  # generic choice
+
+        grid['min_weight_fraction_leaf'] = [ 0.01, 0.001, 0.0001 ]
+
 
     # initialize the training instances
     ################################################################################################################
-    if not boost: # use a random forest
+    if not boost:                                                                   # use a random forest
 
-        RF = RandomForestRegressor if regression else RandomForestClassifier
-
-        RF = RF( n_estimators             =  800 ,
+        ML = RandomForestRegressor if regression else RandomForestClassifier
+        ML = ML(
+                 n_estimators             =  800,                                   # just pick it large anought
                  max_features             = 'sqrt',
-                 max_depth                =  14,
-                 min_weight_fraction_leaf =  0.05,
+                 min_weight_fraction_leaf =  0.01,
                  n_jobs                   =  -1
                  )
 
-        if param_grid is None: 
+    else:                                                                           # use a booster
 
-            param_grid =    {
-                            'min_weight_fraction_leaf': [  0.1, 0.01, 0.005, 0.001, 0.0001 ],
-                            }            
+        ML = GradientBoostingRegressor if regression else GradientBoostingClassifier
+        ML = ML(
+                learning_rate             = 0.1,         # typically tuned
+                n_estimators              = 500,         # chose large but use early stopping,
+                max_features              = 0.5,         # less strict than in RF, since typically less splits
+                min_weight_fraction_leaf  = 0.01,        # important parameter, typically tuned
+                validation_fraction       = 0.25,        # keep it large, to avoid leakage/spurious results
+                n_iter_no_change          = 10,          # for early stopping
+                verbose                   = False,
+               )
 
-        fit_args = { 'sample_weight':sw } 
-
-    else:
-
-        RF =  XGBRegressor if regression else XGBClassifier
-
-        RF = RF(booster             = 'gbtree',             # what method to use
-                objective           = 'reg:squarederror',   # typical regression metric
-                n_estimators        =  500,                 # chose large but use early stopping
-                max_depth           =  14,                  # for regression, can be deep
-                learning_rate       =  0.1,                 # ignored for boosting_type='rf'
-                gamma               =  0.0,                 # regularization parameter
-                colsample_bytree    =  0.3,                 # features to select
-                subsample           =  0.5,                 # LGBM doesn't sample with replacement
-                n_jobs              =  -1,                  # use all available ressources
-                verbosity           =   0,
-                silent              =   True,
-                )
-
-        if param_grid is None: param_grid =  {
-                                              'max_depth':          [  6, 12,            ],
-                                              'learning_rate':      [  0.01, 0.05, 0.1   ],
-                                             }
-
-        # Rather than fixing n_estimators (i.e. n_boosting_rounds) to a decently small value, we instead stop the
-        # training based on an early stopping criteria.
-        # Unfortunately, the GridSearchCV class cannot handle early stopping as measured on the k-folds. Therefore,
-        # we need to reserve some extra data just for the early stopping.  There is, however, some code which would
-        # allow us to adjust for this issue, see for instance [1,2]. But that code is not compatible with scikit-
-        # learns CV-class. I thus keep things simple, and reserve a bit of data for the stopping criteria.
-        # Note: we don't shuffle in the train-test split, to minimize the leakage.
-        # [1] https://www.kaggle.com/yantiz/xgboost-gridsearchcv-with-early-stopping-supported
-        # [2] https://discuss.xgboost.ai/t/how-to-do-early-stopping-with-scikit-learns-gridsearchcv/151
-        ################################################################################################################
-        if sw is None:
-            X, X_stop, y, y_stop              = train_test_split( X, y,     test_size=0.1, shuffle=False )
-        else:
-            X, X_stop, y, y_stop, sw, sw_stop = train_test_split( X, y, sw, test_size=0.1, shuffle=False )
-
-        fit_args = {"early_stopping_rounds":    6,
-                    "eval_set":                 [[X_stop, y_stop]],
-                    "verbose":                  False,
-                    "sample_weight":            sw,
-                    }
+        if param_grid is None: grid['learning_rate']  =  [ 0.01, 0.05, 0.1   ] # generic choice
 
     # cross-validation
     ####################################################################################################################
     scoring  = 'neg_mean_squared_error' if regression else 'f1'
     cv       = KFold( n_splits=5, shuffle=True ) if cv is None else cv
-    grid     = GridSearchCV(RF,
-                            param_grid   =  param_grid,
+    grid     = GridSearchCV(ML,
+                            param_grid   =  grid,
                             scoring      =  scoring,
                             cv           =  cv,
                             refit        =  True,
@@ -117,8 +108,8 @@ def train_RandomForest(X, y,
                             error_score  = 'raise',
                             )
 
-    _         =  grid.fit( X, y, **fit_args  )
-    RF        =  grid.best_estimator_
+    _         =  grid.fit( X, y, sample_weight=sw  )
+    ML        =  grid.best_estimator_
 
     # print status
     ####################################################################################################################
@@ -135,6 +126,6 @@ def train_RandomForest(X, y,
 
     if verbose: print(log)
 
-    if full_ret: return RF, grid, log
-    else:        return RF
+    if full_ret: return ML, grid, log
+    else:        return ML
 
