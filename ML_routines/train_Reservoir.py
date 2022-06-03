@@ -12,7 +12,6 @@ from ML_routines.execution_routines import form_all_combinations
 def train_Reservoir(X, y,
                     frac         = 0.1,
                     param_grid   = None,
-                    clip         = True,
                     verbose      = False,
                     full_ret     = False,
                     ):
@@ -25,7 +24,6 @@ def train_Reservoir(X, y,
     :param y:           The targets.
     :param frac:        Fraction of test data.
     :param param_grid:  Parameter combinations to test (use default ones if None).
-    :param clip:        To use an adjusted tanh-activation function rather than the default linear one.
     :param verbose:     If True, print results. Else, return only as log-file
     :param full_ret:    If True, return not just the instance, but also
 
@@ -46,23 +44,22 @@ def train_Reservoir(X, y,
     assert X.index.identical(y.index),  'X and y have the same index'
     assert frac > 0 and frac < 1,       'frac must be between 0 and 1'
 
-    # By default, we use a linear activation function. This sometimes causes massive outliers (in the out of sample
-    # prediction). Be counter-balance this by creating an adjusted tanh-activation function that clips the massive
-    # outliers.
-    ####################################################################################################################
-    lb, ub = y.quantile(0.01), y.quantile(0.99)         # upper and lower boundaries for observed training targets
-    bound  = max( abs(lb), abs(ub) )                    # whichever is larger in magnitude
-    act    = lambda x: bound * np.tanh( x/bound )       # modified acitivation to clip outlier predictions
-    act    = act if clip else None                      # None means "lambda x: x" (cf. reservoirpy git repo)
 
     # implement reservoir routine
     ####################################################################################################################
-    def initialize_reservoir( delay=2, order=2, ridge=1e-2  ):
+    def initialize_reservoir( delay=1, order=2, ridge=1e-2  ):
         """
-        Initialize NVAR with main tunable parameters.
+        Initialize NVAR with main tunable parameters. 
+
+        :param delay:   Setting it to 1 has the advantage that no temporal history is used. This makes it generally
+                        usable, and not just for time-series.
+
+        :param order:   How many feature product combinations to consider. Above 3 seems tedious.
+
+        :param ridge:   For regularization.                        
         """
 
-        nvar      = NVAR( delay=delay, order=order, strides=1, activation_fun=act )
+        nvar      = NVAR( delay=delay, order=order, strides=1 )
         readout   = Ridge( output_dim=1, ridge=ridge )
         esn_model = nvar >>  readout
 
@@ -70,10 +67,9 @@ def train_Reservoir(X, y,
 
     # form all parameter combinations and train-test split
     ####################################################################################################################
-    if param_grid is None:param_grid = {
-                                        'delay' :   [ 1,    2,    ],
-                                        'ridge' :   [ 0.01,  0.1  ],
-                                        }
+    if param_grid is None: param_grid = {
+                                        'ridge' :  [ 1e-4, 1e-3, 1e-2  ], 
+                                         }
 
     param_grid                       = form_all_combinations(param_grid)
     X, y                             = X.sort_index(), y.sort_index() # make sure it is sorted
