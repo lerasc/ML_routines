@@ -23,7 +23,7 @@ def train_Reservoir(X, y,
     :param X:           The input features (rows are datapoints, columns are features).
     :param y:           The targets.
     :param frac:        Fraction of test data.
-    :param param_grid:  Parameter combinations to test (use default ones if None).
+    :param param_grid:  Parameter grid for cross-validation of 'initialize_reservoir' (cf. arguments inside)
     :param verbose:     If True, print results. Else, return only as log-file
     :param full_ret:    If True, return not just the instance, but also
 
@@ -113,11 +113,7 @@ def train_Reservoir(X, y,
     # retrain on best parameter combination
     ####################################################################################################################
     best_params = param_grid[best] # works because res DataFrame has same index as .iloc
-
-    esn_model   = initialize_reservoir(delay     = best_params['delay'],
-                                       ridge     = best_params['ridge'],
-                                       )
-
+    esn_model   = initialize_reservoir( **best_params )
     esn_model   = esn_model.fit( X      = X.values,
                                  Y      = y.values.reshape(-1,1),
                                  warmup = 10,
