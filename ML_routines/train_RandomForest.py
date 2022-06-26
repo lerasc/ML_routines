@@ -40,7 +40,7 @@ def train_RandomForest(X, y,
     ####################################################################################################################
     assert isinstance(X, pd.DataFrame), 'X must be DataFrame'
     assert isinstance(y, pd.Series),    'y must be Series'
-    assert X.index.identical(y.index),  'X and y have the same index'
+    assert X.index.identical(y.index),  'X and y must have the same index'
 
     # In many regards, min_weight_fraction_leaf is one of the most important parameters, as it allows us to control the
     # tree-depth in a very interpretable manner. However, often it is easier to interpret in absolute, rather than in
@@ -52,10 +52,10 @@ def train_RandomForest(X, y,
     if min_data is not None:
 
         min_frac = min_data / len(X)                          # minimum fraction of data
-        max_frac = 0.1                                        # maximum fraction of data to test for
+        max_frac = 0.2                                        # maximum fraction of data to test for
         fracs    = np.logspace( np.log10(min_frac),           # log-spaced grid of values
                                 np.log10(max_frac),
-                                num  = 5,
+                                num  = 7,
                                 base = 10,
                                 )
         fracs    = np.round( fracs, 5 )                       # just for more visual appeal

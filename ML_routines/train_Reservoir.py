@@ -82,8 +82,6 @@ def train_Reservoir(X, y,
 
     for i, params in enumerate(param_grid):
 
-        if verbose: print(f'training combination {i+1} out of {len(param_grid)}', end='\r')
-
         esn_model = initialize_reservoir( **params )
 
         esn_model = esn_model.fit( X      = X_train.values,
@@ -100,6 +98,9 @@ def train_Reservoir(X, y,
         OS_m, OS_e = subsample_score( y_test, OS_pred, score='rmse' )
 
         res       += [ (IS_m, IS_e, OS_m, OS_e) ]
+
+        if verbose: 
+            print(f'trained combination {param_grid} with performance {OS_m:.3f}+-{OS_e:.3f}')        
 
     # form into a DataFrame and determine the best score
     ####################################################################################################################
