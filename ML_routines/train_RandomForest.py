@@ -5,6 +5,9 @@ import pandas as pd
 from sklearn.ensemble         import RandomForestRegressor,     RandomForestClassifier
 from sklearn.ensemble         import GradientBoostingRegressor, GradientBoostingClassifier
 from sklearn.model_selection  import KFold, GridSearchCV
+from sklearn.metrics          import mean_absolute_error
+
+from matplotlib import pyplot as plt
 
 def train_RandomForest(X, y,
                        sw           = None, 
@@ -15,6 +18,7 @@ def train_RandomForest(X, y,
                        min_data     = None,
                        verbose      = False,
                        full_ret     = False,
+                       **kwargs, 
                        ):
     """
     Train a random forest or boosted forest including k-fold cross-validation.
@@ -30,6 +34,7 @@ def train_RandomForest(X, y,
                         (see inside code for details). If not None, it overwrite the param_grid values.
     :param verbose:     If True, print results. Else, return only as log-file
     :param full_ret:    If True, return more than just the trained NN (cf. return arguments)
+    :param kwargs:      Additional arguments for the RF.
 
     :return RF:         trained and cross-validated RF instance
     :return grid:       GridSearchCV instance
@@ -42,30 +47,12 @@ def train_RandomForest(X, y,
     assert isinstance(y, pd.Series),    'y must be Series'
     assert X.index.identical(y.index),  'X and y must have the same index'
 
-    # In many regards, min_weight_fraction_leaf is one of the most important parameters, as it allows us to control the
-    # tree-depth in a very interpretable manner. However, often it is easier to interpret in absolute, rather than in
-    # relative numbers. Here we thus translate the absolute minimum number of data points in any terminal leaf into a
-    # fraction and then span a reaosnable grid of values.
+    # Set hyper-parameters
     ####################################################################################################################
     grid = param_grid if param_grid is not None else {} # initialize as empty
 
-    if min_data is not None:
-
-        min_frac = min_data / len(X)                          # minimum fraction of data
-        max_frac = 0.2                                        # maximum fraction of data to test for
-        fracs    = np.logspace( np.log10(min_frac),           # log-spaced grid of values
-                                np.log10(max_frac),
-                                num  = 7,
-                                base = 10,
-                                )
-        fracs    = np.round( fracs, 5 )                       # just for more visual appeal
-
-        grid['min_weight_fraction_leaf'] = fracs              # over-write param_grid value, if exists
-
-    elif param_grid is None:                                  # generic choice
-
-        grid['min_weight_fraction_leaf'] = [ 0.01, 0.001, 0.0001 ]
-
+    if min_data is not None: grid['min_weight_fraction_leaf'] = dynamic_min_weight_frac( X, min_data )
+    elif param_grid is None: grid['min_weight_fraction_leaf'] = [ 0.01, 0.001, 0.0001 ]
 
     # initialize the training instances
     ################################################################################################################
@@ -73,10 +60,11 @@ def train_RandomForest(X, y,
 
         ML = RandomForestRegressor if regression else RandomForestClassifier
         ML = ML(
-                 n_estimators             =  800,                                   # just pick it large anought
+                 n_estimators             =  1000,                                 # just pick it large anought
                  max_features             = 'sqrt',
                  min_weight_fraction_leaf =  0.01,
-                 n_jobs                   =  -1
+                 n_jobs                   =  -1, 
+                 **kwargs, 
                  )
 
     else:                                                                           # use a booster
@@ -90,13 +78,14 @@ def train_RandomForest(X, y,
                 validation_fraction       = 0.25,        # keep it large, to avoid leakage/spurious results
                 n_iter_no_change          = 10,          # for early stopping
                 verbose                   = False,
+                **kwargs, 
                )
 
-        if param_grid is None: grid['learning_rate']  =  [ 0.01, 0.05, 0.1   ] # generic choice
+        if param_grid is None: grid['learning_rate']  =  [ 0.01, 0.1   ] # generic choice
 
     # cross-validation
     ####################################################################################################################
-    scoring  = 'neg_mean_squared_error' if regression else 'f1'
+    scoring  = 'neg_mean_absolute_error' if regression else 'f1'
     cv       = KFold( n_splits=5, shuffle=True ) if cv is None else cv
     grid     = GridSearchCV(ML,
                             param_grid   =  grid,
@@ -129,3 +118,64 @@ def train_RandomForest(X, y,
     if full_ret: return ML, grid, log
     else:        return ML
 
+
+def dynamic_min_weight_frac( X, min_data=50  ):
+    """
+    In many regards, min_weight_fraction_leaf is one of the most important parameters, as it allows us to control the
+    tree-depth in a very interpretable manner. However, often it is easier to interpret in absolute, rather than in
+    relative numbers. Here we thus translate the absolute minimum number of data points in any terminal leaf into a
+    fraction and then span a reasonable grid of values, and rerun a log-spaced grid of frac-values.
+
+    :param X:           Feature DataFrame with training data
+    :param min_data:    Minimum number of data-points to be held in any terminal leaf.
+    """
+
+    min_frac = min_data / len(X)                          # minimum fraction of data
+    max_frac = 0.2                                        # maximum fraction of data to test for
+    fracs    = np.logspace( np.log10(min_frac),           # log-spaced grid of values
+                            np.log10(max_frac),
+                            num  = 5,
+                            base = 10,
+                            )
+    fracs    = np.round( fracs, 5 )                       # just for more visual appeal
+
+    return fracs
+
+
+def analyze_RF_overfit( X_IS, y_IS, X_OS, y_OS, **kwargs ):
+    """
+    Given training data (X_IS) and targets (y_IS), as well as OS data (X_OS, y_OS), train a random forst regressor and
+    analyze the dependence of tree complexity on the IS vs. OS error.
+    """
+
+    # set parameters
+    ####################################################################################################################
+    fracs = dynamic_min_weight_frac( X_IS, min_data=1 )
+    errs  = []
+
+    # For each tree depth, train the random forest. We use k-fold so that we can access the CV error, even though we do
+    # not actually tune the parameters with k-fold.
+    ####################################################################################################################
+    for frac in fracs:
+
+        ML, grid, log = train_RandomForest(X            = X_IS,
+                                           y            = y_IS,
+                                           param_grid   = {'min_weight_fraction_leaf':[frac]}, # just one parameter
+                                           verbose      = False,
+                                           full_ret     = True,
+                                           **kwargs,
+                                           )
+
+        IS_pred   = ML.predict( X_IS )
+        OS_pred   = ML.predict( X_OS )
+        IS_err    = mean_absolute_error( y_IS, IS_pred )
+        OS_err    = mean_absolute_error( y_OS, OS_pred )
+
+        CV_err    = grid.cv_results_['mean_test_score'][0]
+        CV_err   *= -1 # since it maximizes on the negative
+
+        errs     += [ (IS_err, CV_err, OS_err) ]
+
+    errs = pd.DataFrame( errs, index=fracs, columns=['IS','CV','OS'] )
+
+    return errs

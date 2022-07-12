@@ -68,7 +68,7 @@ def train_Reservoir(X, y,
     # form all parameter combinations and train-test split
     ####################################################################################################################
     if param_grid is None: param_grid = {
-                                        'ridge' :  [ 1e-4, 1e-3, 1e-2  ], 
+                                        'ridge' :  [ 1e-3, 1e-2, 1e-1  ], 
                                          }
 
     param_grid                       = form_all_combinations(param_grid)
@@ -100,7 +100,7 @@ def train_Reservoir(X, y,
         res       += [ (IS_m, IS_e, OS_m, OS_e) ]
 
         if verbose: 
-            print(f'trained combination {param_grid} with performance {OS_m:.3f}+-{OS_e:.3f}')        
+            print(f'trained combination {params} with performance {OS_m:.3f}+-{OS_e:.3f}')        
 
     # form into a DataFrame and determine the best score
     ####################################################################################################################
