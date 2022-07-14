@@ -5,9 +5,10 @@ import pandas as pd
 from sklearn.ensemble         import RandomForestRegressor,     RandomForestClassifier
 from sklearn.ensemble         import GradientBoostingRegressor, GradientBoostingClassifier
 from sklearn.model_selection  import KFold, GridSearchCV
-from sklearn.metrics          import mean_absolute_error
+from sklearn.metrics          import mean_absolute_error, make_scorer
 
 from matplotlib import pyplot as plt
+
 
 def train_RandomForest(X, y,
                        sw           = None, 
@@ -83,11 +84,14 @@ def train_RandomForest(X, y,
 
         if param_grid is None: grid['learning_rate']  =  [ 0.01, 0.1   ] # generic choice
 
-    # cross-validation
+    # cross-validation: For regression, we use correlation as a metric of success
     ####################################################################################################################
-    scoring  = 'neg_mean_absolute_error' if regression else 'f1'
-    cv       = KFold( n_splits=5, shuffle=True ) if cv is None else cv
-    grid     = GridSearchCV(ML,
+    corr_scor = lambda y_true, y_pred: 100*np.corrcoef(y_true, y_pred)[0,1]  # correlation between target and prediction
+    corr_scor = make_scorer( corr_scor, greater_is_better=True )             # turn into score function 
+    scoring   = corr_scor if regression else 'f1'
+
+    cv        = KFold( n_splits=5, shuffle=True ) if cv is None else cv
+    grid      = GridSearchCV(ML,
                             param_grid   =  grid,
                             scoring      =  scoring,
                             cv           =  cv,
@@ -161,18 +165,17 @@ def analyze_RF_overfit( X_IS, y_IS, X_OS, y_OS, **kwargs ):
         ML, grid, log = train_RandomForest(X            = X_IS,
                                            y            = y_IS,
                                            param_grid   = {'min_weight_fraction_leaf':[frac]}, # just one parameter
+                                           regression   = True, 
                                            verbose      = False,
                                            full_ret     = True,
                                            **kwargs,
                                            )
 
-        IS_pred   = ML.predict( X_IS )
-        OS_pred   = ML.predict( X_OS )
-        IS_err    = mean_absolute_error( y_IS, IS_pred )
-        OS_err    = mean_absolute_error( y_OS, OS_pred )
-
+        IS_pred   = pd.Series( ML.predict( X_IS ), index=X_IS.index ) 
+        OS_pred   = pd.Series( ML.predict( X_OS ), index=X_OS.index )
+        IS_err    = 100 * y_IS.corr( IS_pred )
+        OS_err    = 100 * y_OS.corr( OS_pred )
         CV_err    = grid.cv_results_['mean_test_score'][0]
-        CV_err   *= -1 # since it maximizes on the negative
 
         errs     += [ (IS_err, CV_err, OS_err) ]
 

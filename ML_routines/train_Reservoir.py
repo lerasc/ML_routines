@@ -120,7 +120,9 @@ def train_Reservoir(X, y,
                                  warmup = 10,
                                  )
 
-    ESN         = esn_wrapper( esn_model )
+    IS_pred     = esn_model.run( X.values ).squeeze()
+    lb, ub      = np.percentile( IS_pred, 0.5 ), np.percentile( IS_pred, 99.5 )
+    ESN         = esn_wrapper( esn_model, lb, ub)
 
     if full_ret: return ESN, esn_model, res
     else:        return ESN
@@ -131,10 +133,15 @@ class esn_wrapper:
     Simple wrapper around esn model (cf. train_Reservoir) that adds a .predict-method for consistent usage with other
     scikit-learn methods.
 
-    :param esn_model:   A trained instance of reservoirpy (cf. output of train_Reservoir).
+    :param esn_model:       A trained instance of reservoirpy (cf. output of train_Reservoir).
+    :param lower_bound:     Lower bound at which predictions are to be clipped (since sometimes creates outliers)
+    :param upper_bound:     Upper bound at which predictions are to be clipped (since sometimes creates outliers)
     """
-    def __init__(self,  esn_model ):
+    def __init__(self,  esn_model, lower_bound=None, upper_bound=None ):
+
         self.__esn = esn_model
+        self.__lb  = lower_bound if lower_bound is not None else -np.inf
+        self.__ub  = upper_bound if upper_bound is not None else  np.inf
 
     def predict( self, X ):
         """
@@ -142,6 +149,7 @@ class esn_wrapper:
         """
         pred = self.__esn.run( X.values )
         pred = pred.squeeze()
+        pred = np.clip( pred, a_min=self.__lb, a_max=self.__ub )
 
         return pred
         

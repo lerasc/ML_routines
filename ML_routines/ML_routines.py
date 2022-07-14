@@ -3,6 +3,8 @@ import numpy   as np
 import pandas  as pd
 import seaborn as sb
 
+from matplotlib import pyplot as plt
+
 from sklearn.metrics  import accuracy_score, f1_score, confusion_matrix, roc_curve, roc_auc_score, mean_squared_error
 
 
@@ -79,14 +81,13 @@ def subsample_score( y_true, y_pred, score='rmse', ns=100  ):
 
     :param y_true:  Pandas Series of targets.
     :param y_pred:  Pandas Series of predicted values
-    :param score:   What score to use. Default is 'rmse' but can by any function that takes as input y_true and y_pred.
+    :param score:       What score to use. Default is 'rmse' but can by any score function compatible with scikit-learn.
     :param ns:      Number of times to sub-sample.
     """
 
-    if score is not callable:
+    if not callable(score):
         assert score=='rmse', "if score is not a function, it must be 'rmse'"
         score = lambda true, pred: np.sqrt( mean_squared_error(true,pred) )
-
 
     true    = y_true.rename('true')
     pred    = y_pred.rename('pred')
@@ -97,6 +98,88 @@ def subsample_score( y_true, y_pred, score='rmse', ns=100  ):
     std     = np.nanstd(vals)
 
     return mean, std
+
+
+def plot_performance_by_bin( y_true, y_pred, score='rmse', bin_by='true', bin_style='quantile', ax=None, **kwargs ):
+    """
+    Plot the prediction performance sorted by bins.
+
+    :param y_true:      Pandas Series of targets.
+    :param y_pred:      Pandas Series of predicted values
+    :param score:       What score to use. Default is 'rmse' but can by any score function compatible with scikit-learn.
+    :param bin_by:      Whether to bin by the 'true' values or the 'predicted' ones.
+    :param bin_style:   Whether to use 'quantile' bins or 'size' bins that are spaced equally around 0.
+                        Alternatively, a list of bin boundaries may be provided.
+    :param ax:          Plotting instance to plot into
+    :param kwargs:      Additional arguments for seaborn's barplot
+    """
+
+    # check that input is provided in correct format
+    ####################################################################################################################
+    assert bin_by in ['true','predicted'], f'invalid bin_by argument {bin_by}'
+
+    if not callable(score):
+        assert score=='rmse', "if score is not a function, it must be 'rmse'"
+        score = lambda true, pred: np.sqrt( mean_squared_error(true,pred) )
+
+    if ax is None: _, ax = plt.subplots(figsize=(12,6))
+
+    # create DataFrame and calculate total score
+    ####################################################################################################################
+    data          = pd.concat( [y_true, y_pred], axis=1 )               # merge together
+    data.columns  = ['true','predicted']                                # apropriate name
+    data          = data.dropna()                                       # remove missing data
+    score_func    = lambda x: score( x['true'], x['predicted'] )        # function of one argument
+    tot           = score_func( data )                                  # overall score
+
+    # creat the bins
+    ####################################################################################################################
+    if bin_style=='size': # create same number of equal size bins to the left and right of 0
+
+        left_bins     = np.linspace( data[bin_by].min(),   0,                     6 )
+        right_bins    = np.linspace( 0,                       data[bin_by].max(), 6 )
+        bins          = list(left_bins) + list(right_bins[1:])
+        data['bin']   = pd.cut( data[bin_by], bins=bins )
+
+    elif bin_style=='quantile': # create bins such the same number of data is in each bin
+
+        data['bin']   = pd.qcut( data[bin_by], q=9 )
+
+    else:
+
+        assert isinstance( bin_style, list ), 'bin boundaries must be list'
+
+        data['bin']   = pd.cut( data[bin_by], bins=bin_style )
+
+    # calculate the score on each bin
+    ####################################################################################################################
+    perf         = data.groupby('bin').apply( score_func ).rename('score')                         # score per bin
+    perf.index   = [f'[{np.round(ind.left, 2)}, {np.round(ind.right, 2)}]' for ind in perf.index ] # nice names
+    perf         = perf.reset_index().rename({'index':'bin'}, axis=1)                              # rename
+
+    counts       = data.groupby('bin').apply( lambda x: f'{len(x):,}' )       # number of data points per bin
+    counts       = counts.values
+
+    _       = sb.barplot(  x          =  'bin',                               # plot the bins
+                           y          =  'score',
+                           data       =   perf,
+                           capsize    =   0.2,
+                           fill       =   False,
+                           ax         =   ax,
+                           **kwargs,
+                           )
+
+    _       = ax.bar_label( container   =  ax.containers[-1],                 # annotate nr of data per bin
+                            labels      =  counts,
+                            label_type  = 'edge',
+                            fontsize    =  11,
+                            rotation    =  0,
+                            )
+
+    _       = ax.set_xticks(range(len(perf)), perf['bin'], rotation=90 )      # annotate bins
+    _       = ax.set_ylabel('score', fontsize=12)
+    _       = ax.set_xlabel('')
+    _       = ax.set_title(f'total score: {tot:.2f}', fontsize=12)
 
 
 def balanced_downsample( X, target='target', classification=True, center=0, nr_bins=25  ):
