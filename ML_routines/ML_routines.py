@@ -182,7 +182,7 @@ def plot_performance_by_bin( y_true, y_pred, score='rmse', bin_by='true', bin_st
     _       = ax.set_title(f'total score: {tot:.2f}', fontsize=12)
 
 
-def balanced_downsample( X, target='target', classification=True, center=0, nr_bins=25  ):
+def balanced_downsample( X, target='target', classification=True, center=0, nr_bins=25, upsample=False ):
     """
     For many ML tasks, it is important to have a balanced set of targets. For classification, this means the same number
     of data-points in each class. For regression, this generalizes to having the same number of datapoints in each
@@ -204,6 +204,11 @@ def balanced_downsample( X, target='target', classification=True, center=0, nr_b
                             (0,1). The same amount of data in the interval (-2,-1) as in (1,2), and so forth.
 
     :param nr_bins:         Specifies the number of quantile bins (only needed if classification=False).
+
+    :param upsample:        If True, upsample instead of downsample within the bins.
+
+    :return new_X:          Same as X but with balanced training data. Attention: index ordering is now typically
+                            different from original one. Sorting and similar will be lost.
     """
 
     # check input
@@ -217,17 +222,18 @@ def balanced_downsample( X, target='target', classification=True, center=0, nr_b
     ####################################################################################################################
     if classification:
 
-        counts = X[target].value_counts()               # count all target values
-        n      = counts.min()                           # target value with least data
-        Xs     = []                                     # stores sub-frames of each target value
+        counts = X[target].value_counts()                                   # count all target values
+        n      = counts.max() if upsample else counts.min()                 # target value with most/least data
+        Xs     = []                                                         # stores sub-frames of each target value
 
-        for _, df in X.groupby(target):                 # group by target
+        for _, df in X.groupby(target):                                     # group by target
 
-            sdf  = df.sample( n=n, replace=False )      # downsample to the minority class
-            Xs  += [sdf]                                # collect
+            replace  = False if not upsample or len(df)==n else True        # don't replace for majority class
+            sdf      = df.sample( n=n, replace=replace )                    # each class should have n values
+            Xs      += [sdf]                                                # collect
 
-        X = pd.concat(Xs, axis='index')                 # concatenate
-        X = X.sample( frac=1, replace=False )           # shuffle
+        X = pd.concat(Xs, axis='index')                                     # concatenate
+        X = X.sample( frac=1, replace=False )                               # shuffle
 
         return X
 
@@ -258,20 +264,16 @@ def balanced_downsample( X, target='target', classification=True, center=0, nr_b
         nv = len(sY['sgn_target'].value_counts())                       # number of distinct values
         assert nv==2, 'nv should have 2 values.'                        # should be two 
 
-        sY = balanced_downsample( X               = sY,                 # recursive call
+        sY = balanced_downsample( X              = sY,                  # recursive call
                                   target         ='sgn_target',         # balance the sign in each bin
                                   classification = True,                # treat as discrete
+                                  upsample       = upsample,            # keep consistent
                                   )
 
         sX     = nX.reindex(sY.index)                                   # select related X data (index must be unique!)
         new_X += [ sX ]                                                 # append to list
 
     new_X = pd.concat(new_X, axis='index')                              # stack back together
-
-    # Rearange index of new data back to index of original index, so that the ordering (e.g. in time-series data)
-    # states the same.
-    ####################################################################################################################
-    new_X = new_X.reindex( X.index ).dropna( )
 
     return new_X
     

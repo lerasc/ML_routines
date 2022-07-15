@@ -121,7 +121,7 @@ def train_Reservoir(X, y,
                                  )
 
     IS_pred     = esn_model.run( X.values ).squeeze()
-    lb, ub      = np.percentile( IS_pred, 0.5 ), np.percentile( IS_pred, 99.5 )
+    lb, ub      = np.percentile( IS_pred, 0.2 ), np.percentile( IS_pred, 99.8 )
     ESN         = esn_wrapper( esn_model, lb, ub)
 
     if full_ret: return ESN, esn_model, res
