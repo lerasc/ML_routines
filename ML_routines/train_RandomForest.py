@@ -71,15 +71,16 @@ def train_RandomForest(X, y,
                  objective        = 'reg:squarederror' if regression else 'binary:logistic',
                  slient           =  0,
                  nthread          =  cpu_count()-2,
-                 subsample        =  0.7,
-                 colsample_bytree =  0.8,
+                 subsample        =  0.75,
+                 colsample_bytree =  0.5,
                  **kwargs,
                  )
 
         if param_grid is None:
 
-            grid = {  "learning_rate":     [ 0.01, 0.05, 0.10 ],
-                      "max_depth":         [  2, 4, 6 ],
+            grid = {  "learning_rate":     [  0.01, 0.05, 0.10   ],
+                      "max_depth":         [  2,    4,    6      ],
+                      "n_estimators":      [  50,   100,  200    ],
                        }
 
     # cross-validation: For regression, we use correlation as a metric of success
