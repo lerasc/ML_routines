@@ -4,6 +4,7 @@ import pandas  as pd
 import seaborn as sb
 
 from matplotlib import pyplot as plt
+from math       import log10, floor
 
 from sklearn.metrics  import accuracy_score, f1_score, confusion_matrix, roc_curve, roc_auc_score, mean_squared_error
 
@@ -114,6 +115,16 @@ def plot_performance_by_bin( y_true, y_pred, score='rmse', bin_by='true', bin_st
     :param kwargs:      Additional arguments for seaborn's barplot
     """
 
+    # sub-routines
+    ####################################################################################################################
+    def smart_round(x):
+        """
+        Round x to two significant digits. 
+        """
+        if pd.isnull(x) or x==0.0: return x 
+
+        return round(x, -int(floor(log10(abs(x))))+1)    
+
     # check that input is provided in correct format
     ####################################################################################################################
     assert bin_by in ['true','predicted'], f'invalid bin_by argument {bin_by}'
@@ -154,7 +165,7 @@ def plot_performance_by_bin( y_true, y_pred, score='rmse', bin_by='true', bin_st
     # calculate the score on each bin
     ####################################################################################################################
     perf         = data.groupby('bin').apply( score_func ).rename('score')                         # score per bin
-    perf.index   = [f'[{np.round(ind.left, 2)}, {np.round(ind.right, 2)}]' for ind in perf.index ] # nice names
+    perf.index   = [f'[{smart_round(ind.left)}, {smart_round(ind.right)}]' for ind in perf.index ] # nice names
     perf         = perf.reset_index().rename({'index':'bin'}, axis=1)                              # rename
 
     counts       = data.groupby('bin').apply( lambda x: f'{len(x):,}' )       # number of data points per bin
@@ -168,6 +179,7 @@ def plot_performance_by_bin( y_true, y_pred, score='rmse', bin_by='true', bin_st
                            ax         =   ax,
                            **kwargs,
                            )
+
 
     _       = ax.bar_label( container   =  ax.containers[-1],                 # annotate nr of data per bin
                             labels      =  counts,
@@ -254,8 +266,8 @@ def balanced_downsample( X, target='target', classification=True, center=0, nr_b
     nX[target]      = nX[target].clip(-clip, clip)                      # also need to clip target
 
     Y               = Y.to_frame()                                      # make into DataFrame
-    Y['abs_target'] =          Y['target'].abs()                        # take absolute values
-    Y['sgn_target'] = np.sign( Y['target'] )                            # sign: deviation from center
+    Y['abs_target'] =          Y[target].abs()                          # take absolute values
+    Y['sgn_target'] = np.sign( Y[target] )                              # sign: deviation from center
     Y['bin']        = pd.cut(  Y['abs_target'], bins=nr_bins  )         # assign to quantile-bins
     new_X           = []                                                # stores the new values
 
