@@ -5,6 +5,7 @@ import pandas as pd
 from multiprocessing          import cpu_count
 from sklearn.ensemble         import RandomForestRegressor,     RandomForestClassifier
 from sklearn.model_selection  import KFold, GridSearchCV
+from sklearn.metrics          import mean_absolute_error
 from xgboost                  import XGBRegressor, XGBClassifier
 
 def train_RandomForest(X, y,
@@ -168,13 +169,12 @@ def analyze_RF_overfit( X_IS, y_IS, X_OS, y_OS, **kwargs ):
                                            **kwargs,
                                            )
 
-        IS_pred   = pd.Series( ML.predict( X_IS ), index=X_IS.index ) 
-        OS_pred   = pd.Series( ML.predict( X_OS ), index=X_OS.index )
-        IS_err    = 100 * y_IS.corr( IS_pred )
-        OS_err    = 100 * y_OS.corr( OS_pred )
-        CV_err    = grid.cv_results_['mean_test_score'][0]
-
-        errs     += [ (IS_err, CV_err, OS_err) ]
+        IS_pred  =  pd.Series( ML.predict( X_IS ), index=X_IS.index ) 
+        OS_pred  =  pd.Series( ML.predict( X_OS ), index=X_OS.index )
+        IS_err   =  mean_absolute_error( y_IS, IS_pred )
+        OS_err   =  mean_absolute_error( y_OS, OS_pred )
+        CV_err   = -grid.cv_results_['mean_test_score'][0] # CV maximizes negative MAE
+        errs    += [ (IS_err, CV_err, OS_err) ]
 
     errs = pd.DataFrame( errs, index=fracs, columns=['IS','CV','OS'] )
 

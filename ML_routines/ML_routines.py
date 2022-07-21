@@ -101,7 +101,15 @@ def subsample_score( y_true, y_pred, score='rmse', ns=100  ):
     return mean, std
 
 
-def plot_performance_by_bin( y_true, y_pred, score='rmse', bin_by='true', bin_style='quantile', ax=None, **kwargs ):
+def plot_performance_by_bin(    y_true, 
+                                y_pred, 
+                                score       = 'rmse', 
+                                bin_by      = 'true', 
+                                bin_style   = 'quantile', 
+                                center      =  0, 
+                                ax          =  None, 
+                                **kwargs 
+                                ):
     """
     Plot the prediction performance sorted by bins.
 
@@ -111,6 +119,7 @@ def plot_performance_by_bin( y_true, y_pred, score='rmse', bin_by='true', bin_st
     :param bin_by:      Whether to bin by the 'true' values or the 'predicted' ones.
     :param bin_style:   Whether to use 'quantile' bins or 'size' bins that are spaced equally around 0.
                         Alternatively, a list of bin boundaries may be provided.
+    :param center:      Center point of bins if bin_style='size', ignored else. 
     :param ax:          Plotting instance to plot into
     :param kwargs:      Additional arguments for seaborn's barplot
     """
@@ -147,10 +156,10 @@ def plot_performance_by_bin( y_true, y_pred, score='rmse', bin_by='true', bin_st
     ####################################################################################################################
     if bin_style=='size': # create same number of equal size bins to the left and right of 0
 
-        left_bins     = np.linspace( data[bin_by].min(),   0,                     6 )
-        right_bins    = np.linspace( 0,                       data[bin_by].max(), 6 )
+        left_bins     = np.linspace( data[bin_by].min(),   center,                6 )
+        right_bins    = np.linspace( center,               data[bin_by].max(),    6 )
         bins          = list(left_bins) + list(right_bins[1:])
-        data['bin']   = pd.cut( data[bin_by], bins=bins )
+        data['bin']   = pd.cut( data[bin_by], bins=bins, duplicates='drop' )
 
     elif bin_style=='quantile': # create bins such the same number of data is in each bin
 
