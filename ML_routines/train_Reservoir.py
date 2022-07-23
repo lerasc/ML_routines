@@ -120,6 +120,9 @@ def train_Reservoir(X, y,
                                  warmup = 10,
                                  )
 
+    # The reservoir is susceptible to outlier predictions. Therefore, we clip upon wrapping the trained method into 
+    # a class that has a .predict()-method. 
+    ####################################################################################################################
     IS_pred     = esn_model.run( X.values ).squeeze()
     lb, ub      = np.percentile( IS_pred, 0.2 ), np.percentile( IS_pred, 99.8 )
     ESN         = esn_wrapper( esn_model, lb, ub)

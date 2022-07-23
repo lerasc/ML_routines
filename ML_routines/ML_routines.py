@@ -4,6 +4,7 @@ import pandas  as pd
 import seaborn as sb
 
 from matplotlib import pyplot as plt
+from math       import log10, floor
 
 from sklearn.metrics  import accuracy_score, f1_score, confusion_matrix, roc_curve, roc_auc_score, mean_squared_error
 
@@ -100,7 +101,15 @@ def subsample_score( y_true, y_pred, score='rmse', ns=100  ):
     return mean, std
 
 
-def plot_performance_by_bin( y_true, y_pred, score='rmse', bin_by='true', bin_style='quantile', ax=None, **kwargs ):
+def plot_performance_by_bin(    y_true, 
+                                y_pred, 
+                                score       = 'rmse', 
+                                bin_by      = 'true', 
+                                bin_style   = 'quantile', 
+                                center      =  0, 
+                                ax          =  None, 
+                                **kwargs 
+                                ):
     """
     Plot the prediction performance sorted by bins.
 
@@ -110,9 +119,20 @@ def plot_performance_by_bin( y_true, y_pred, score='rmse', bin_by='true', bin_st
     :param bin_by:      Whether to bin by the 'true' values or the 'predicted' ones.
     :param bin_style:   Whether to use 'quantile' bins or 'size' bins that are spaced equally around 0.
                         Alternatively, a list of bin boundaries may be provided.
+    :param center:      Center point of bins if bin_style='size', ignored else. 
     :param ax:          Plotting instance to plot into
     :param kwargs:      Additional arguments for seaborn's barplot
     """
+
+    # sub-routines
+    ####################################################################################################################
+    def smart_round(x):
+        """
+        Round x to two significant digits. 
+        """
+        if pd.isnull(x) or x==0.0: return x 
+
+        return round(x, -int(floor(log10(abs(x))))+1)    
 
     # check that input is provided in correct format
     ####################################################################################################################
@@ -136,10 +156,10 @@ def plot_performance_by_bin( y_true, y_pred, score='rmse', bin_by='true', bin_st
     ####################################################################################################################
     if bin_style=='size': # create same number of equal size bins to the left and right of 0
 
-        left_bins     = np.linspace( data[bin_by].min(),   0,                     6 )
-        right_bins    = np.linspace( 0,                       data[bin_by].max(), 6 )
+        left_bins     = np.linspace( data[bin_by].min(),   center,                6 )
+        right_bins    = np.linspace( center,               data[bin_by].max(),    6 )
         bins          = list(left_bins) + list(right_bins[1:])
-        data['bin']   = pd.cut( data[bin_by], bins=bins )
+        data['bin']   = pd.cut( data[bin_by], bins=bins, duplicates='drop' )
 
     elif bin_style=='quantile': # create bins such the same number of data is in each bin
 
@@ -154,7 +174,7 @@ def plot_performance_by_bin( y_true, y_pred, score='rmse', bin_by='true', bin_st
     # calculate the score on each bin
     ####################################################################################################################
     perf         = data.groupby('bin').apply( score_func ).rename('score')                         # score per bin
-    perf.index   = [f'[{np.round(ind.left, 2)}, {np.round(ind.right, 2)}]' for ind in perf.index ] # nice names
+    perf.index   = [f'[{smart_round(ind.left)}, {smart_round(ind.right)}]' for ind in perf.index ] # nice names
     perf         = perf.reset_index().rename({'index':'bin'}, axis=1)                              # rename
 
     counts       = data.groupby('bin').apply( lambda x: f'{len(x):,}' )       # number of data points per bin
@@ -168,6 +188,7 @@ def plot_performance_by_bin( y_true, y_pred, score='rmse', bin_by='true', bin_st
                            ax         =   ax,
                            **kwargs,
                            )
+
 
     _       = ax.bar_label( container   =  ax.containers[-1],                 # annotate nr of data per bin
                             labels      =  counts,
@@ -254,8 +275,8 @@ def balanced_downsample( X, target='target', classification=True, center=0, nr_b
     nX[target]      = nX[target].clip(-clip, clip)                      # also need to clip target
 
     Y               = Y.to_frame()                                      # make into DataFrame
-    Y['abs_target'] =          Y['target'].abs()                        # take absolute values
-    Y['sgn_target'] = np.sign( Y['target'] )                            # sign: deviation from center
+    Y['abs_target'] =          Y[target].abs()                          # take absolute values
+    Y['sgn_target'] = np.sign( Y[target] )                              # sign: deviation from center
     Y['bin']        = pd.cut(  Y['abs_target'], bins=nr_bins  )         # assign to quantile-bins
     new_X           = []                                                # stores the new values
 

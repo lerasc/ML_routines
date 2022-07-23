@@ -2,13 +2,11 @@
 import numpy  as np
 import pandas as pd
 
+from multiprocessing          import cpu_count
 from sklearn.ensemble         import RandomForestRegressor,     RandomForestClassifier
-from sklearn.ensemble         import GradientBoostingRegressor, GradientBoostingClassifier
 from sklearn.model_selection  import KFold, GridSearchCV
-from sklearn.metrics          import mean_absolute_error, make_scorer
-
-from matplotlib import pyplot as plt
-
+from sklearn.metrics          import mean_absolute_error
+from xgboost                  import XGBRegressor, XGBClassifier
 
 def train_RandomForest(X, y,
                        sw           = None, 
@@ -48,20 +46,19 @@ def train_RandomForest(X, y,
     assert isinstance(y, pd.Series),    'y must be Series'
     assert X.index.identical(y.index),  'X and y must have the same index'
 
-    # Set hyper-parameters
-    ####################################################################################################################
-    grid = param_grid if param_grid is not None else {} # initialize as empty
-
-    if min_data is not None: grid['min_weight_fraction_leaf'] = dynamic_min_weight_frac( X, min_data )
-    elif param_grid is None: grid['min_weight_fraction_leaf'] = [ 0.01, 0.001, 0.0001 ]
-
     # initialize the training instances
     ################################################################################################################
     if not boost:                                                                   # use a random forest
 
+        # Set hyper-parameters
+        grid = param_grid if param_grid is not None else {} # initialize as empty
+
+        if min_data is not None: grid['min_weight_fraction_leaf'] =  dynamic_min_weight_frac( X, min_data )
+        elif param_grid is None: grid['min_weight_fraction_leaf'] = [ 0.10, 0.05, 0.01, 0.001, 0.0001 ]
+
         ML = RandomForestRegressor if regression else RandomForestClassifier
         ML = ML(
-                 n_estimators             =  1000,                                 # just pick it large anought
+                 n_estimators             =  1000,                                 # just pick it large enough
                  max_features             = 'sqrt',
                  min_weight_fraction_leaf =  0.01,
                  n_jobs                   =  -1,
@@ -70,36 +67,37 @@ def train_RandomForest(X, y,
 
     else:                                                                           # use a booster
 
-        ML = GradientBoostingRegressor if regression else GradientBoostingClassifier
-        ML = ML(
-                learning_rate             = 0.1,         # typically tuned
-                n_estimators              = 500,         # chose large but use early stopping,
-                max_features              = 0.5,         # less strict than in RF, since typically less splits
-                min_weight_fraction_leaf  = 0.01,        # important parameter, typically tuned
-                validation_fraction       = 0.25,        # keep it large, to avoid leakage/spurious results
-                n_iter_no_change          = 10,          # for early stopping
-                verbose                   = False,
-                **kwargs, 
-               )
+        ML = XGBRegressor if regression else XGBClassifier
+        ML = ML( booster          = 'gbtree',
+                 objective        = 'reg:squarederror' if regression else 'binary:logistic',
+                 slient           =  0,
+                 nthread          =  cpu_count()-2,
+                 subsample        =  0.75,
+                 colsample_bytree =  0.5,
+                 **kwargs,
+                 )
 
-        if param_grid is None: grid['learning_rate']  =  [ 0.01, 0.1   ] # generic choice
+        if param_grid is None:
+
+            grid = {  "learning_rate":     [  0.01, 0.05, 0.10   ],
+                      "max_depth":         [  2,    4,    6      ],
+                      "n_estimators":      [  50,   100,  200    ],
+                       }
 
     # cross-validation: For regression, we use correlation as a metric of success
     ####################################################################################################################
-    corr_scor = lambda y_true, y_pred: 100*np.corrcoef(y_true, y_pred)[0,1]  # correlation between target and prediction
-    corr_scor = make_scorer( corr_scor, greater_is_better=True )             # turn into score function 
-    scoring   = corr_scor if regression else 'f1'
+    scoring  = 'neg_mean_absolute_error' if regression else 'f1'
+    cv       =  KFold( n_splits=5, shuffle=True ) if cv is None else cv
 
-    cv        = KFold( n_splits=5, shuffle=True ) if cv is None else cv
-    grid      = GridSearchCV(ML,
-                            param_grid   =  grid,
-                            scoring      =  scoring,
-                            cv           =  cv,
-                            refit        =  True,
-                            n_jobs       =  -1, 
-                            verbose      =  verbose,
-                            error_score  = 'raise',
-                            )
+    grid     =  GridSearchCV(ML,
+                             param_grid   =  grid,
+                             scoring      =  scoring,
+                             cv           =  cv,
+                             refit        =  True,
+                             n_jobs       =  -1, 
+                             verbose      =  verbose,
+                             error_score  = 'raise',
+                             )
 
     _         =  grid.fit( X, y, sample_weight=sw  )
     ML        =  grid.best_estimator_
@@ -123,7 +121,7 @@ def train_RandomForest(X, y,
     else:        return ML
 
 
-def dynamic_min_weight_frac( X, min_data=50  ):
+def dynamic_min_weight_frac( X, min_data=100  ):
     """
     In many regards, min_weight_fraction_leaf is one of the most important parameters, as it allows us to control the
     tree-depth in a very interpretable manner. However, often it is easier to interpret in absolute, rather than in
@@ -171,13 +169,12 @@ def analyze_RF_overfit( X_IS, y_IS, X_OS, y_OS, **kwargs ):
                                            **kwargs,
                                            )
 
-        IS_pred   = pd.Series( ML.predict( X_IS ), index=X_IS.index ) 
-        OS_pred   = pd.Series( ML.predict( X_OS ), index=X_OS.index )
-        IS_err    = 100 * y_IS.corr( IS_pred )
-        OS_err    = 100 * y_OS.corr( OS_pred )
-        CV_err    = grid.cv_results_['mean_test_score'][0]
-
-        errs     += [ (IS_err, CV_err, OS_err) ]
+        IS_pred  =  pd.Series( ML.predict( X_IS ), index=X_IS.index ) 
+        OS_pred  =  pd.Series( ML.predict( X_OS ), index=X_OS.index )
+        IS_err   =  mean_absolute_error( y_IS, IS_pred )
+        OS_err   =  mean_absolute_error( y_OS, OS_pred )
+        CV_err   = -grid.cv_results_['mean_test_score'][0] # CV maximizes negative MAE
+        errs    += [ (IS_err, CV_err, OS_err) ]
 
     errs = pd.DataFrame( errs, index=fracs, columns=['IS','CV','OS'] )
 
