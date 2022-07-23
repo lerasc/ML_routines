@@ -64,8 +64,8 @@ def train_RandomForest(X, y,
                  n_estimators             =  1000,                                 # just pick it large anought
                  max_features             = 'sqrt',
                  min_weight_fraction_leaf =  0.01,
-                 n_jobs                   =  -1, 
-                 **kwargs, 
+                 n_jobs                   =  -1,
+                 **kwargs,
                  )
 
     else:                                                                           # use a booster
